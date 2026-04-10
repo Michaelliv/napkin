@@ -67,7 +67,10 @@ function spawnDetachedDistill(
   );
   const forkedSm = SessionManager.forkFrom(sessionFile, cwd, tmpSessionDir);
   const forkedSessionFile = forkedSm.getSessionFile();
-  if (!forkedSessionFile) return;
+  if (!forkedSessionFile) {
+    fs.rmSync(tmpSessionDir, { recursive: true, force: true });
+    return;
+  }
 
   // Wrap in a shell that cleans up the temp dir after pi exits
   const piArgs = [
@@ -160,15 +163,27 @@ export default function (pi: ExtensionAPI) {
       intervalHandle = null;
     }
 
-    // If a distill is already running, detach it instead of killing it
-    if (activeProcess) {
+    // If a distill is already running, detach it instead of killing it.
+    // The parent's finally block may never run after shutdown, so we
+    // re-spawn as a detached shell wrapper that cleans up the temp dir.
+    if (activeProcess && activeTmpDir) {
+      const tmpDir = activeTmpDir;
       try {
-        activeProcess.unref();
+        activeProcess.kill();
       } catch {
         // already dead — ignore
       }
       activeProcess = null;
-      activeTmpDir = null; // skip cleanup in runDistill's finally block
+      activeTmpDir = null;
+
+      // Re-spawn as detached so it survives parent exit with cleanup
+      const vaultPath = findVaultPath(ctx.cwd);
+      if (!vaultPath) return;
+      const config = loadDistillConfig(vaultPath);
+      const sessionFile = ctx.sessionManager.getSessionFile?.();
+      if (!sessionFile) return;
+      spawnDetachedDistill(sessionFile, ctx.cwd, config);
+      fs.rmSync(tmpDir, { recursive: true, force: true });
       return;
     }
 
