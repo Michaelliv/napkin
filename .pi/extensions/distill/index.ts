@@ -53,6 +53,41 @@ const DISTILL_PROMPT = `Distill this conversation into the napkin vault.
 
 Be selective. Only capture knowledge useful to someone working on this project later. Skip meta-discussion, tool output, and chatter.`;
 
+/**
+ * Spawn a detached pi distill process that survives parent exit.
+ * Returns immediately — the child runs independently.
+ */
+function spawnDetachedDistill(
+  sessionFile: string,
+  cwd: string,
+  config: DistillConfig,
+): void {
+  const tmpSessionDir = fs.mkdtempSync(
+    path.join(os.tmpdir(), "napkin-distill-"),
+  );
+  const forkedSm = SessionManager.forkFrom(sessionFile, cwd, tmpSessionDir);
+  const forkedSessionFile = forkedSm.getSessionFile();
+  if (!forkedSessionFile) return;
+
+  // Wrap in a shell that cleans up the temp dir after pi exits
+  const piArgs = [
+    "--session",
+    forkedSessionFile,
+    "-p",
+    "--model",
+    `${config.model.provider}/${config.model.id}`,
+    DISTILL_PROMPT,
+  ];
+  const shellCmd = `pi ${piArgs.map((a) => `'${a.replace(/'/g, "'\\''")}'`).join(" ")}; rm -rf '${tmpSessionDir}'`;
+
+  const proc = spawn("sh", ["-c", shellCmd], {
+    cwd,
+    detached: true,
+    stdio: "ignore",
+  });
+  proc.unref();
+}
+
 export default function (pi: ExtensionAPI) {
   let intervalHandle: ReturnType<typeof setInterval> | null = null;
   let countdownHandle: ReturnType<typeof setInterval> | null = null;
@@ -60,6 +95,7 @@ export default function (pi: ExtensionAPI) {
   let lastSessionSize = 0;
   let isRunning = false;
   let activeProcess: ReturnType<typeof spawn> | null = null;
+  let activeTmpDir: string | null = null;
 
   pi.on("session_start", async (_event, ctx) => {
     const vaultPath = findVaultPath(ctx.cwd);
@@ -113,7 +149,8 @@ export default function (pi: ExtensionAPI) {
     );
   });
 
-  pi.on("session_shutdown", async () => {
+  pi.on("session_shutdown", async (_event, ctx) => {
+
     if (countdownHandle) {
       clearInterval(countdownHandle);
       countdownHandle = null;
@@ -122,10 +159,36 @@ export default function (pi: ExtensionAPI) {
       clearInterval(intervalHandle);
       intervalHandle = null;
     }
+
+    // If a distill is already running, detach it instead of killing it
     if (activeProcess) {
-      activeProcess.kill();
+      try {
+        activeProcess.unref();
+      } catch {
+        // already dead — ignore
+      }
       activeProcess = null;
+      activeTmpDir = null; // skip cleanup in runDistill's finally block
+      return;
     }
+
+    // No distill running — check if session has new content worth distilling
+    const vaultPath = findVaultPath(ctx.cwd);
+    if (!vaultPath) return;
+
+    const config = loadDistillConfig(vaultPath);
+    if (!config.enabled) return;
+
+    const sessionFile = ctx.sessionManager.getSessionFile?.();
+    if (!sessionFile) return;
+
+    const currentSize = fs.existsSync(sessionFile)
+      ? fs.statSync(sessionFile).size
+      : 0;
+    if (currentSize === 0 || currentSize === lastSessionSize) return;
+
+    // Spawn a detached distill that outlives this process
+    spawnDetachedDistill(sessionFile, ctx.cwd, config);
   });
 
   async function runDistill(ctx: {
@@ -182,6 +245,7 @@ export default function (pi: ExtensionAPI) {
     const tmpSessionDir = fs.mkdtempSync(
       path.join(os.tmpdir(), "napkin-distill-"),
     );
+    activeTmpDir = tmpSessionDir;
     let forkedSessionFile: string | null = null;
 
     try {
@@ -262,8 +326,11 @@ export default function (pi: ExtensionAPI) {
     } finally {
       if (timerHandle) clearInterval(timerHandle);
       isRunning = false;
-      // Clean up forked session
-      fs.rmSync(tmpSessionDir, { recursive: true, force: true });
+      // Clean up forked session — skip if shutdown detached the process
+      if (activeTmpDir === tmpSessionDir) {
+        fs.rmSync(tmpSessionDir, { recursive: true, force: true });
+        activeTmpDir = null;
+      }
     }
   }
 
