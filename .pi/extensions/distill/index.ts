@@ -81,7 +81,7 @@ function spawnDetachedDistill(
     `${config.model.provider}/${config.model.id}`,
     DISTILL_PROMPT,
   ];
-  const shellCmd = `nohup pi ${piArgs.map((a) => `'${a.replace(/'/g, "'\\''")}'`).join(" ")} >/dev/null 2>&1; rm -rf '${tmpSessionDir}'`;
+  const shellCmd = `trap '' HUP; pi ${piArgs.map((a) => `'${a.replace(/'/g, "'\\''")}'`).join(" ")} >/dev/null 2>&1; rm -rf '${tmpSessionDir}'`;
 
   const proc = spawn("sh", ["-c", shellCmd], {
     cwd,
