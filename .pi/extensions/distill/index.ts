@@ -5,6 +5,12 @@ import * as path from "node:path";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { SessionManager } from "@mariozechner/pi-coding-agent";
 
+// Process-level guards for SIGHUP handler
+let sighupRegistered = false;
+let sighupSpawned = false;
+let latestCtx: any = null;
+let latestConfig: DistillConfig | null = null;
+
 interface DistillConfig {
   enabled: boolean;
   intervalMinutes: number;
@@ -38,6 +44,11 @@ function findVaultPath(cwd: string): string | null {
     }
     dir = path.dirname(dir);
   }
+  // Fallback: check $HOME/.napkin (vault may not be under cwd's tree)
+  const homeNapkin = path.join(os.homedir(), ".napkin");
+  if (fs.existsSync(homeNapkin)) {
+    return homeNapkin;
+  }
   return null;
 }
 
@@ -55,6 +66,7 @@ Be selective. Only capture knowledge useful to someone working on this project l
 
 /**
  * Spawn a detached pi distill process that survives parent exit.
+ * Uses `trap '' HUP` so both the shell and pi survive SIGHUP (tmux pane close).
  * Returns immediately — the child runs independently.
  */
 function spawnDetachedDistill(
@@ -117,6 +129,26 @@ export default function (pi: ExtensionAPI) {
       return;
     }
 
+    // Catch SIGHUP (tmux pane close / cmd+W in iTerm) — pi gets killed
+    // before session_shutdown can run, so we spawn the detached distill here.
+    // Store latest ctx so the handler always uses the most recent session.
+    latestCtx = ctx;
+    latestConfig = config;
+    if (!sighupRegistered) {
+      sighupRegistered = true;
+      process.on('SIGHUP', () => {
+        if (process.env.NAPKIN_DISTILL_NO_RECURSE) return;
+        if (sighupSpawned) return;
+        sighupSpawned = true;
+        const ctx = latestCtx!;
+        const sessionFile = ctx.sessionManager.getSessionFile?.();
+        if (!sessionFile || !fs.existsSync(sessionFile)) return;
+        const currentSize = fs.statSync(sessionFile).size;
+        if (currentSize === 0 || currentSize === lastSessionSize) return;
+        spawnDetachedDistill(sessionFile, ctx.cwd, latestConfig!);
+      });
+    }
+
     lastDistillTimestamp = Date.now();
     const intervalMs = config.intervalMinutes * 60 * 1000;
 
@@ -156,7 +188,6 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_shutdown", async (_event, ctx) => {
     // Prevent infinite recursion: detached distill processes must not spawn more distills
     if (process.env.NAPKIN_DISTILL_NO_RECURSE) return;
-
 
     if (countdownHandle) {
       clearInterval(countdownHandle);
