@@ -87,6 +87,7 @@ function spawnDetachedDistill(
     cwd,
     detached: true,
     stdio: "ignore",
+    env: { ...process.env, NAPKIN_DISTILL_NO_RECURSE: "1" },
   });
   proc.unref();
 }
@@ -153,6 +154,9 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("session_shutdown", async (_event, ctx) => {
+    // Prevent infinite recursion: detached distill processes must not spawn more distills
+    if (process.env.NAPKIN_DISTILL_NO_RECURSE) return;
+
 
     if (countdownHandle) {
       clearInterval(countdownHandle);
