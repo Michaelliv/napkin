@@ -5,9 +5,18 @@ import * as path from "node:path";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { SessionManager } from "@mariozechner/pi-coding-agent";
 
-// Process-level guards for SIGHUP handler
-let sighupRegistered = false;
-let sighupSpawned = false;
+const DEBUG = process.env.NAPKIN_DISTILL_DEBUG !== "0";
+const LOG_FILE = "/tmp/napkin-distill.log";
+function dbg(msg: string) {
+  if (!DEBUG) return;
+  fs.appendFileSync(LOG_FILE, `[${new Date().toISOString()}] ${msg}\n`);
+}
+
+dbg(`EXTENSION LOADED pid=${process.pid}`);
+
+// Process-level guards for SIGHUP/SIGTERM handler
+let signalHandlerRegistered = false;
+let signalSpawned = false;
 let latestCtx: any = null;
 let latestConfig: DistillConfig | null = null;
 
@@ -66,7 +75,6 @@ Be selective. Only capture knowledge useful to someone working on this project l
 
 /**
  * Spawn a detached pi distill process that survives parent exit.
- * Uses `trap '' HUP` so both the shell and pi survive SIGHUP (tmux pane close).
  * Returns immediately — the child runs independently.
  */
 function spawnDetachedDistill(
@@ -93,7 +101,7 @@ function spawnDetachedDistill(
     `${config.model.provider}/${config.model.id}`,
     DISTILL_PROMPT,
   ];
-  const shellCmd = `trap '' HUP; pi ${piArgs.map((a) => `'${a.replace(/'/g, "'\\''")}'`).join(" ")} >/dev/null 2>&1; rm -rf '${tmpSessionDir}'`;
+  const shellCmd = `trap '' HUP; ${DEBUG ? `echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] START pid=$$ tmpdir=${tmpSessionDir}" >> ${LOG_FILE};` : ""} pi ${piArgs.map((a) => `'${a.replace(/'/g, "'\\''")}'`).join(" ")} >/dev/null 2>&1; ${DEBUG ? `echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] DONE pid=$$ exit=$?" >> ${LOG_FILE};` : ""} rm -rf '${tmpSessionDir}'`;
 
   const proc = spawn("sh", ["-c", shellCmd], {
     cwd,
@@ -129,24 +137,29 @@ export default function (pi: ExtensionAPI) {
       return;
     }
 
-    // Catch SIGHUP (tmux pane close / cmd+W in iTerm) — pi gets killed
-    // before session_shutdown can run, so we spawn the detached distill here.
-    // Store latest ctx so the handler always uses the most recent session.
+    // Catch SIGHUP/SIGTERM (tmux pane close, kill <pid>) — pi does not
+    // handle these, so session_shutdown never fires. Spawn detached distill here.
     latestCtx = ctx;
     latestConfig = config;
-    if (!sighupRegistered) {
-      sighupRegistered = true;
-      process.on('SIGHUP', () => {
-        if (process.env.NAPKIN_DISTILL_NO_RECURSE) return;
-        if (sighupSpawned) return;
-        sighupSpawned = true;
+    if (!signalHandlerRegistered) {
+      signalHandlerRegistered = true;
+      const handleSignal = (sig: string) => {
+        if (process.env.NAPKIN_DISTILL_NO_RECURSE) { dbg(`${sig}: skip: NO_RECURSE`); return; }
+        if (signalSpawned) { dbg(`${sig}: skip: already spawned`); return; }
+        signalSpawned = true;
+        dbg(`${sig}: caught pid=${process.pid}`);
         const ctx = latestCtx!;
         const sessionFile = ctx.sessionManager.getSessionFile?.();
+        dbg(`${sig}: sessionFile=${sessionFile} exists=${sessionFile ? fs.existsSync(sessionFile) : 'N/A'}`);
         if (!sessionFile || !fs.existsSync(sessionFile)) return;
         const currentSize = fs.statSync(sessionFile).size;
+        dbg(`${sig}: currentSize=${currentSize} lastSessionSize=${lastSessionSize}`);
         if (currentSize === 0 || currentSize === lastSessionSize) return;
         spawnDetachedDistill(sessionFile, ctx.cwd, latestConfig!);
-      });
+        dbg(`${sig}: spawned detached distill`);
+      };
+      process.on('SIGHUP', () => handleSignal('SIGHUP'));
+      process.on('SIGTERM', () => handleSignal('SIGTERM'));
     }
 
     lastDistillTimestamp = Date.now();
@@ -186,8 +199,9 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("session_shutdown", async (_event, ctx) => {
+    dbg(`SHUTDOWN: entered cwd=${ctx.cwd}`);
     // Prevent infinite recursion: detached distill processes must not spawn more distills
-    if (process.env.NAPKIN_DISTILL_NO_RECURSE) return;
+    if (process.env.NAPKIN_DISTILL_NO_RECURSE) { dbg('SHUTDOWN: skip: NO_RECURSE'); return; }
 
     if (countdownHandle) {
       clearInterval(countdownHandle);
@@ -202,6 +216,7 @@ export default function (pi: ExtensionAPI) {
     // The parent's finally block may never run after shutdown, so we
     // re-spawn as a detached shell wrapper that cleans up the temp dir.
     if (activeProcess && activeTmpDir) {
+      dbg('SHUTDOWN: path: activeProcess+activeTmpDir — re-spawning detached');
       const tmpDir = activeTmpDir;
       try {
         activeProcess.kill();
@@ -213,32 +228,37 @@ export default function (pi: ExtensionAPI) {
 
       // Re-spawn as detached so it survives parent exit with cleanup
       const vaultPath = findVaultPath(ctx.cwd);
-      if (!vaultPath) return;
+      if (!vaultPath) { dbg('SHUTDOWN: skip: no vault'); return; }
       const config = loadDistillConfig(vaultPath);
       const sessionFile = ctx.sessionManager.getSessionFile?.();
-      if (!sessionFile) return;
+      if (!sessionFile) { dbg('SHUTDOWN: skip: no session file'); return; }
       spawnDetachedDistill(sessionFile, ctx.cwd, config);
       fs.rmSync(tmpDir, { recursive: true, force: true });
+      dbg('SHUTDOWN: re-spawned detached');
       return;
     }
 
     // No distill running — check if session has new content worth distilling
     const vaultPath = findVaultPath(ctx.cwd);
-    if (!vaultPath) return;
+    dbg(`SHUTDOWN: vaultPath=${vaultPath} cwd=${ctx.cwd}`);
+    if (!vaultPath) { dbg('SHUTDOWN: skip: no vault'); return; }
 
     const config = loadDistillConfig(vaultPath);
-    if (!config.enabled) return;
+    if (!config.enabled) { dbg('SHUTDOWN: skip: not enabled'); return; }
 
     const sessionFile = ctx.sessionManager.getSessionFile?.();
-    if (!sessionFile) return;
+    dbg(`SHUTDOWN: sessionFile=${sessionFile} exists=${sessionFile ? fs.existsSync(sessionFile) : 'N/A'}`);
+    if (!sessionFile) { dbg('SHUTDOWN: skip: no session file'); return; }
 
     const currentSize = fs.existsSync(sessionFile)
       ? fs.statSync(sessionFile).size
       : 0;
-    if (currentSize === 0 || currentSize === lastSessionSize) return;
+    dbg(`SHUTDOWN: currentSize=${currentSize} lastSessionSize=${lastSessionSize}`);
+    if (currentSize === 0 || currentSize === lastSessionSize) { dbg('SHUTDOWN: skip: no change'); return; }
 
     // Spawn a detached distill that outlives this process
     spawnDetachedDistill(sessionFile, ctx.cwd, config);
+    dbg('SHUTDOWN: spawned detached');
   });
 
   async function runDistill(ctx: {
