@@ -30,6 +30,8 @@ describe("findVault", () => {
 
   test("auto-creates vault when none found", () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "napkin-auto-"));
+    const origXdg = process.env.XDG_CONFIG_HOME;
+    process.env.XDG_CONFIG_HOME = tmpDir; // isolate from global config
     try {
       const result = findVault(tmpDir);
       expect(result.contentPath).toBe(tmpDir);
@@ -41,7 +43,61 @@ describe("findVault", () => {
       expect(fs.existsSync(path.join(tmpDir, "NAPKIN.md"))).toBe(true);
       expect(fs.existsSync(path.join(tmpDir, ".obsidian"))).toBe(true);
     } finally {
+      if (origXdg !== undefined) process.env.XDG_CONFIG_HOME = origXdg;
+      else delete process.env.XDG_CONFIG_HOME;
       fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  test("falls back to global vault from XDG config", () => {
+    const globalDir = fs.mkdtempSync(path.join(os.tmpdir(), "napkin-global-vault-"));
+    const configDir = fs.mkdtempSync(path.join(os.tmpdir(), "napkin-global-config-"));
+    const napkinConfigDir = path.join(configDir, "napkin");
+    fs.mkdirSync(napkinConfigDir, { recursive: true });
+    // Create a vault in globalDir
+    const napkinDir = path.join(globalDir, ".napkin");
+    fs.mkdirSync(path.join(napkinDir, ".obsidian"), { recursive: true });
+    fs.writeFileSync(
+      path.join(napkinDir, "config.json"),
+      JSON.stringify({ vault: { root: "..", obsidian: "../.obsidian" } }),
+    );
+    // Write global config pointing to globalDir
+    fs.writeFileSync(
+      path.join(napkinConfigDir, "config.json"),
+      JSON.stringify({ vault: globalDir }),
+    );
+    const origXdg = process.env.XDG_CONFIG_HOME;
+    process.env.XDG_CONFIG_HOME = configDir;
+    try {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "napkin-fallback-"));
+      const result = findVault(tmpDir);
+      expect(result.configPath).toBe(path.join(globalDir, ".napkin"));
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    } finally {
+      if (origXdg !== undefined) process.env.XDG_CONFIG_HOME = origXdg;
+      else delete process.env.XDG_CONFIG_HOME;
+      fs.rmSync(globalDir, { recursive: true, force: true });
+      fs.rmSync(configDir, { recursive: true, force: true });
+    }
+  });
+
+  test("ignores invalid global config", () => {
+    const configDir = fs.mkdtempSync(path.join(os.tmpdir(), "napkin-bad-config-"));
+    const napkinConfigDir = path.join(configDir, "napkin");
+    fs.mkdirSync(napkinConfigDir, { recursive: true });
+    fs.writeFileSync(path.join(napkinConfigDir, "config.json"), "not json");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "napkin-no-vault-"));
+    const origXdg = process.env.XDG_CONFIG_HOME;
+    process.env.XDG_CONFIG_HOME = configDir;
+    try {
+      const result = findVault(tmpDir);
+      // Should fall through to createBareVault
+      expect(result.contentPath).toBe(tmpDir);
+    } finally {
+      if (origXdg !== undefined) process.env.XDG_CONFIG_HOME = origXdg;
+      else delete process.env.XDG_CONFIG_HOME;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+      fs.rmSync(configDir, { recursive: true, force: true });
     }
   });
 

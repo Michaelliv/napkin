@@ -74,9 +74,10 @@ function getGlobalConfigVault(): string | null {
     const raw = JSON.parse(fs.readFileSync(configPath, "utf-8"));
     if (!raw.vault) return null;
 
-    const vaultPath: string = raw.vault.startsWith("~")
-      ? path.join(os.homedir(), raw.vault.slice(1))
-      : path.resolve(raw.vault);
+    const vaultPath =
+      raw.vault === "~" || raw.vault.startsWith("~/")
+        ? path.join(os.homedir(), raw.vault.slice(1))
+        : path.resolve(path.dirname(configPath), raw.vault);
 
     const napkinDir = path.join(vaultPath, ".napkin");
     if (fs.existsSync(napkinDir)) return napkinDir;
