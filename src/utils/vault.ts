@@ -1,4 +1,5 @@
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 
 export interface VaultInfo {
@@ -14,7 +15,8 @@ export interface VaultInfo {
 
 /**
  * Walk up from startDir looking for .napkin/ (or .obsidian/.napkin/ for nested layout).
- * Resolves the vault layout from config to determine content, config, and obsidian paths.
+ * Falls back to the global vault configured in $XDG_CONFIG_HOME/napkin/config.json.
+ * Creates a bare vault at the starting directory as a last resort.
  */
 export function findVault(startDir?: string): VaultInfo {
   let dir = path.resolve(startDir || process.cwd());
@@ -40,11 +42,49 @@ export function findVault(startDir?: string): VaultInfo {
 
     const parent = path.dirname(dir);
     if (parent === dir || dir === root) {
-      // No vault found — create a bare one at the starting directory
-      return createBareVault(startingDir);
+      break;
     }
     dir = parent;
   }
+
+  // Fall back to global vault from user config
+  const globalVault = getGlobalConfigVault();
+  if (globalVault) {
+    return resolveVaultLayout(globalVault, path.dirname(globalVault));
+  }
+
+  // No vault found — create a bare one at the starting directory
+  return createBareVault(startingDir);
+}
+
+/**
+ * Check for a global vault configured in the user's config directory.
+ * Reads the `vault` field from $XDG_CONFIG_HOME/napkin/config.json
+ * (defaults to ~/.config/napkin/config.json).
+ *
+ * Returns the .napkin/ path if a valid vault is configured, null otherwise.
+ */
+function getGlobalConfigVault(): string | null {
+  const configHome =
+    process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
+  const configPath = path.join(configHome, "napkin", "config.json");
+  if (!fs.existsSync(configPath)) return null;
+
+  try {
+    const raw = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+    if (!raw.vault) return null;
+
+    const vaultPath: string = raw.vault.startsWith("~")
+      ? path.join(os.homedir(), raw.vault.slice(1))
+      : path.resolve(raw.vault);
+
+    const napkinDir = path.join(vaultPath, ".napkin");
+    if (fs.existsSync(napkinDir)) return napkinDir;
+  } catch {
+    // invalid config
+  }
+
+  return null;
 }
 
 /**
