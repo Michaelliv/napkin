@@ -15,6 +15,7 @@
   ],
   "scripts": {
     "build": "tsc",
+    "prepare": "npm run build",
     "prepublishOnly": "npm run build",
     "dev": "bun run src/main.ts",
     "build:bun": "bun build --compile src/main.ts --outfile napkin",
