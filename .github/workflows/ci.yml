@@ -9,8 +9,15 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [20, 22, 25]
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
@@ -19,5 +26,11 @@ jobs:
         run: npx @biomejs/biome check src/
       - name: Type check
         run: npx tsc --noEmit
+      - name: Build
+        run: npm run build
+      - name: Verify graph command is ESM-safe
+        run: |
+          test -f dist/commands/graph.js
+          ! grep -n 'require("node:child_process")\|require("child_process")\|require(' dist/commands/graph.js
       - name: Run tests
         run: bun test
