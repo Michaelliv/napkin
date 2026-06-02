@@ -25,6 +25,9 @@ napkin search "authentication"
 # Read a file
 napkin read "Architecture"
 
+# Update the CLI
+napkin update
+
 # Write
 napkin create "Decision" --template Decision
 napkin append "Decision" "We chose Postgres."
@@ -164,6 +167,7 @@ napkin read "Note" -q           # Raw markdown, nothing else
 ```bash
 napkin vault                          # Vault info
 napkin overview                       # Vault map with keywords
+napkin update                         # Update the napkin CLI
 napkin read <file>                    # Read file contents
 napkin create "Note" $'# Hello\nFirst note.'   # Create with content
 napkin append "Note" $'\n## Update\nNew info.'   # Append to file

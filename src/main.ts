@@ -57,6 +57,7 @@ import {
   templateRead,
   templates,
 } from "./commands/templates.js";
+import { update } from "./commands/update.js";
 import { vault } from "./commands/vault.js";
 import { wordcount } from "./commands/wordcount.js";
 
@@ -92,6 +93,7 @@ Examples:
   $ napkin overview                  See what's in the vault
   $ napkin search "auth"             Find content about auth
   $ napkin read "Architecture"       Read a specific file
+  $ napkin update                    Update the napkin CLI
 
 Workflow: init → overview → search → read
 
@@ -101,6 +103,7 @@ Getting started:
   vault                Show vault info (path, file count, size)
   config               Vault configuration (show, get, set)
   graph                Interactive vault graph visualization
+  update               Update the napkin CLI via npm
 
 Reading:
   read <file>          Read a file
@@ -180,6 +183,14 @@ program
   .action(async (_opts, cmd) => {
     const root = cmd.optsWithGlobals();
     await vault(root);
+  });
+
+program
+  .command("update")
+  .description("Update the napkin CLI")
+  .action(async (_opts, cmd) => {
+    const root = cmd.optsWithGlobals();
+    await update(root);
   });
 
 // ── Reading ─────────────────────────────────────────────────────────
