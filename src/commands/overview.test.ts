@@ -75,12 +75,16 @@ describe("overview", () => {
     const warnings: string[] = [];
     const captured: unknown[] = [];
     const origLog = console.log;
+    const origError = console.error;
 
     try {
-      console.log = (...args: unknown[]) => {
+      // Warnings go to stderr so they never corrupt --json output on stdout.
+      console.error = (...args: unknown[]) => {
         const msg = args.map(String).join(" ");
         if (msg.includes("⚠")) warnings.push(msg);
-        else captured.push(...args);
+      };
+      console.log = (...args: unknown[]) => {
+        captured.push(...args);
       };
       await overview({
         vault: vault.path,
@@ -90,6 +94,7 @@ describe("overview", () => {
       });
     } finally {
       console.log = origLog;
+      console.error = origError;
     }
 
     const result = JSON.parse(captured[0] as string) as {
@@ -175,6 +180,110 @@ Two merchants need migration plans.`,
     expect(decisionsFolder?.keywords).not.toContain("context");
     expect(decisionsFolder?.keywords).not.toContain("decision");
     expect(decisionsFolder?.keywords).not.toContain("consequences");
+
+    vault.cleanup();
+  });
+
+  test("strips structured noise from converted documents", async () => {
+    const vault = createTempVault({
+      "contracts/lease.md": `# Lease agreement
+DocuSign Envelope ID: AAAA1111-2222-4333-ADAB-BCF123456789
+<div align="center">&nbsp;</div>
+Tenant leases the third floor. Envelope ID: BBBB2222-3333-4444-EAEC-DEF987654321
+Sublease requires landlord approval and a bank guarantee.`,
+      "contracts/parking.md": `# Parking addendum
+DocuSign Envelope ID: CCCC3333-4444-4555-FADE-CAB456789012
+<div align="center">&nbsp;</div>
+Reserved parking slots on level B2. Guarantee covers parking fees.`,
+    });
+
+    const result = (await runOverviewJson(vault.path)) as {
+      overview: Array<{ path: string; keywords: string[] }>;
+    };
+    const folder = result.overview.find((f) => f.path === "contracts");
+    expect(folder).toBeDefined();
+    const tokens = folder?.keywords.flatMap((k) => k.split(" ")) ?? [];
+    // GUID shrapnel ("adeb", "f25", ...) and HTML residue never become keywords
+    for (const t of tokens) {
+      expect(t).not.toMatch(/^[a-f0-9]{3,8}$/);
+      expect(t).not.toBe("div");
+      expect(t).not.toBe("align");
+      expect(t).not.toBe("nbsp");
+    }
+    expect(tokens).toContain("guarantee");
+
+    vault.cleanup();
+  });
+
+  test("collapses numerous homogeneous sibling folders", async () => {
+    const files: Record<string, string> = {
+      "procedures/deploy.md":
+        "# Deploy checklist\nRun the smoke tests, then promote the build.",
+    };
+    // six near-identical converted-contract subfolders under imports/ —
+    // heavy shared boilerplate, rotated so no sentence is in every folder
+    const boilerplate = [
+      "Lease agreement between landlord and tenant with signature page attached.",
+      "Rent schedule and lease term apply as stated in the appendix.",
+      "Bank guarantee and insurance certificate are required before occupancy.",
+    ];
+    for (let i = 0; i < 6; i++) {
+      const shared = boilerplate.filter((_, j) => j !== i % 3).join("\n");
+      files[`imports/tenant-${i}/contract.md`] =
+        `# Converted document ${i}\n${shared}\nSuite ${100 + i} on floor ${i}.`;
+    }
+    const vault = createTempVault(files);
+
+    const result = (await runOverviewJson(vault.path)) as {
+      overview: Array<{
+        path: string;
+        notes: number;
+        collapsedFolders?: number;
+      }>;
+    };
+    const paths = result.overview.map((f) => f.path);
+    expect(paths).toContain("imports");
+    expect(paths).not.toContain("imports/tenant-0");
+    const imports = result.overview.find((f) => f.path === "imports");
+    expect(imports?.collapsedFolders).toBe(6);
+    expect(imports?.notes).toBe(6);
+    // curated folder untouched
+    expect(paths).toContain("procedures");
+
+    // top-level folders are never collapsed into the root
+    expect(paths).not.toContain("/");
+
+    // --no-collapse restores the full listing
+    const flat = (await runOverviewJson(vault.path, { collapse: false })) as {
+      overview: Array<{ path: string }>;
+    };
+    expect(flat.overview.map((f) => f.path)).toContain("imports/tenant-0");
+
+    vault.cleanup();
+  });
+
+  test("keeps heterogeneous sibling folders separate", async () => {
+    const files: Record<string, string> = {};
+    const topics = [
+      ["alpha", "Kubernetes ingress routing and pod autoscaling policies."],
+      ["beta", "Payroll tax withholding tables for hourly contractors."],
+      ["gamma", "Sourdough fermentation schedules and hydration ratios."],
+      ["delta", "Telescope collimation steps for reflector optics."],
+      ["epsilon", "Beehive winterization and varroa mite treatment."],
+      ["zeta", "Marathon training splits and lactate threshold pacing."],
+    ] as const;
+    for (const [name, body] of topics) {
+      files[`areas/${name}/note.md`] = `# ${name} notes\n${body}`;
+    }
+    const vault = createTempVault(files);
+
+    const result = (await runOverviewJson(vault.path)) as {
+      overview: Array<{ path: string }>;
+    };
+    const paths = result.overview.map((f) => f.path);
+    for (const [name] of topics) {
+      expect(paths).toContain(`areas/${name}`);
+    }
 
     vault.cleanup();
   });

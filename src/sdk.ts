@@ -115,7 +115,11 @@ export class Napkin {
     return getVaultMetadata(this.vault);
   }
 
-  overview(opts?: { depth?: number; keywords?: number }): VaultOverview {
+  overview(opts?: {
+    depth?: number;
+    keywords?: number;
+    collapse?: boolean;
+  }): VaultOverview {
     return getOverview(this.vault.contentPath, this.vault.configPath, opts);
   }
 
