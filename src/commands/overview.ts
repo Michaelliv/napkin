@@ -12,12 +12,14 @@ export async function overview(
     vault?: string;
     depth?: string;
     keywords?: string;
+    collapse?: boolean;
   },
 ) {
   const n = new Napkin(opts.vault || process.cwd());
   const result = n.overview({
     depth: opts.depth ? Number.parseInt(opts.depth, 10) : undefined,
     keywords: opts.keywords ? Number.parseInt(opts.keywords, 10) : undefined,
+    ...(opts.collapse === false ? { collapse: false } : {}),
   });
 
   for (const w of result.warnings ?? []) {
@@ -41,7 +43,10 @@ export async function overview(
         return;
       }
       for (const f of result.overview) {
-        console.log(bold(f.path === "/" ? "./" : `${f.path}/`));
+        const collapsedNote = f.collapsedFolders
+          ? dim(` (+${f.collapsedFolders} similar subfolders)`)
+          : "";
+        console.log(bold(f.path === "/" ? "./" : `${f.path}/`) + collapsedNote);
         if (f.keywords.length > 0) {
           console.log(`  ${dim("keywords:")} ${f.keywords.join(", ")}`);
         }

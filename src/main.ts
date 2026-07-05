@@ -161,6 +161,7 @@ program
   .description("Vault map with keywords (Level 1 progressive disclosure)")
   .option("--depth <n>", "Max folder depth")
   .option("--keywords <n>", "Max keywords per folder")
+  .option("--no-collapse", "Do not roll up homogeneous sibling folders")
   .action(async (opts, cmd) => {
     const root = { ...cmd.optsWithGlobals(), ...opts };
     await overview(root);
