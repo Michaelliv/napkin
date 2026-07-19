@@ -144,6 +144,44 @@ describe("search", () => {
     expect(alpha?.snippets.length).toBeGreaterThan(1);
   });
 
+  test("does not index the .gitignore file itself", async () => {
+    fs.writeFileSync(
+      path.join(v.vaultPath, ".gitignore"),
+      "gitignore-only-marker\n",
+    );
+
+    const data = await captureJson(() =>
+      search({
+        json: true,
+        vault: v.path,
+        query: "gitignore-only-marker",
+      }),
+    );
+    const results = data.results as { file: string }[];
+    expect(results).toEqual([]);
+  });
+
+  test("currently indexes Markdown files matched by .gitignore", async () => {
+    fs.writeFileSync(path.join(v.vaultPath, ".gitignore"), "generated/\n");
+    fs.mkdirSync(path.join(v.vaultPath, "generated"), { recursive: true });
+    fs.writeFileSync(
+      path.join(v.vaultPath, "generated", "ignored.md"),
+      "# Generated\nignored-markdown-marker\n",
+    );
+
+    const data = await captureJson(() =>
+      search({
+        json: true,
+        vault: v.path,
+        query: "ignored-markdown-marker",
+      }),
+    );
+    const results = data.results as { file: string }[];
+    expect(results.map((result) => result.file)).toContain(
+      "generated/ignored.md",
+    );
+  });
+
   test("empty query returns no results", async () => {
     const data = await captureJson(() =>
       search({
