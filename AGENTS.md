@@ -24,8 +24,7 @@ bun run check                # Biome lint + format
 - `src/utils/markdown.ts` — Extract headings, tasks, tags, links from markdown
 - `src/utils/search-cache.ts` — Search index cache + whole-vault mtime fingerprint
 - `src/utils/overview-cache.ts` — Overview result cache (fingerprint + options key)
-- `.pi/extensions/napkin-context/` — Pi extension: injects vault overview into system prompt
-- `.pi/extensions/distill/` — Pi extension: auto-distills conversations into vault
+- `skills/` — Agent skills shipped in the npm package: `distill` (conversation → vault notes) and `tend` (periodic vault upkeep)
 
 ## Vault Structure
 
