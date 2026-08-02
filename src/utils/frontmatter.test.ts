@@ -25,6 +25,27 @@ describe("parseFrontmatter", () => {
     expect(result.properties).toEqual({});
     expect(result.body).toContain("Body");
   });
+
+  test("throws on malformed YAML", () => {
+    const bad = "---\ntags: [#malformed, #unique-a]\n---\nBody";
+    expect(() => parseFrontmatter(bad)).toThrow();
+  });
+
+  test("throws consistently on repeated parses of identical malformed YAML", () => {
+    // gray-matter caches the file object BEFORE parsing, so without eviction
+    // the second parse of the same string silently returns empty data.
+    const bad = "---\ntags: [#malformed, #unique-b]\n---\nBody";
+    expect(() => parseFrontmatter(bad)).toThrow();
+    expect(() => parseFrontmatter(bad)).toThrow();
+    expect(() => parseFrontmatter(bad)).toThrow();
+  });
+
+  test("valid content still parses after a malformed parse", () => {
+    const bad = "---\ntags: [#malformed, #unique-c]\n---\nBody";
+    expect(() => parseFrontmatter(bad)).toThrow();
+    const good = parseFrontmatter("---\ntitle: Fine\n---\nBody");
+    expect(good.properties.title).toBe("Fine");
+  });
 });
 
 describe("setProperty", () => {

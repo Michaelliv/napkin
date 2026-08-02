@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import MiniSearch from "minisearch";
+import { FerroSearch } from "@shift-labs/ferrosearch";
 import { loadConfig } from "../utils/config.js";
 import { listFiles, resolveFileLoose } from "../utils/files.js";
 import { extractLinks } from "../utils/markdown.js";
@@ -33,6 +33,24 @@ interface DocRecord {
   mtime: number;
 }
 
+/** The shape of one search hit; ferrosearch types results as `unknown`. */
+interface IndexHit {
+  id: number;
+  score: number;
+}
+
+// Shared by indexing and cache loading: loadJson requires the exact options
+// the index was serialized with, so there must be a single definition.
+const INDEX_OPTIONS = {
+  fields: ["basename", "content"],
+  storeFields: ["file"],
+  searchOptions: {
+    boost: { basename: 2 },
+    fuzzy: 0.2,
+    prefix: true,
+  },
+};
+
 function buildIndex(vaultPath: string, folder?: string) {
   const files = listFiles(vaultPath, { folder, ext: "md" });
 
@@ -44,16 +62,7 @@ function buildIndex(vaultPath: string, folder?: string) {
     return { id, file, basename, content, mtime: stat.mtimeMs };
   });
 
-  const index = new MiniSearch({
-    fields: ["basename", "content"],
-    storeFields: ["file"],
-    searchOptions: {
-      boost: { basename: 2 },
-      fuzzy: 0.2,
-      prefix: true,
-    },
-  });
-
+  const index = new FerroSearch(INDEX_OPTIONS);
   index.addAll(docs);
   return { index, docs };
 }
@@ -141,20 +150,12 @@ export function searchVault(
   const fingerprint = computeFingerprint(contentPath, opts?.path);
   const cached = loadSearchCache(configPath, fingerprint);
 
-  let index: MiniSearch;
+  let index: FerroSearch;
   let docs: DocRecord[];
   let backlinkCounts: Map<string, number>;
 
   if (cached) {
-    index = MiniSearch.loadJSON(cached.index, {
-      fields: ["basename", "content"],
-      storeFields: ["file"],
-      searchOptions: {
-        boost: { basename: 2 },
-        fuzzy: 0.2,
-        prefix: true,
-      },
-    });
+    index = FerroSearch.loadJson(cached.index, INDEX_OPTIONS);
     docs = cached.docs.map((d) => {
       const fullPath = path.join(contentPath, d.file);
       const content = fs.readFileSync(fullPath, "utf-8");
@@ -169,13 +170,15 @@ export function searchVault(
 
     saveSearchCache(configPath, {
       fingerprint,
-      index: JSON.stringify(index),
+      // ferrosearch has no toJSON, so JSON.stringify(index) would not work;
+      // toJsonString writes the MiniSearch version-2 format in one native pass.
+      index: index.toJsonString(),
       docs: docs.map(({ content: _, ...rest }) => rest),
       backlinkCounts: Object.fromEntries(backlinkCounts),
     });
   }
 
-  const results = index.search(query);
+  const results = index.search(query) as IndexHit[];
   const contextLines = opts?.snippetLines ?? config.search.snippetLines;
   const limit = opts?.limit ?? config.search.limit;
 

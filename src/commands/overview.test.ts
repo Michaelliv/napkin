@@ -110,6 +110,57 @@ describe("overview", () => {
     vault.cleanup();
   });
 
+  test("warns for every file with identical malformed frontmatter", async () => {
+    // Regression: gray-matter's parse cache is poisoned by a failed parse,
+    // so a second file with byte-identical malformed frontmatter used to
+    // silently parse as empty data — no warning, wrong tags/keywords.
+    const badContent =
+      "---\ntags: [#twin, #copies]\n---\n# Twin\nIdentical broken note.";
+    const vault = createTempVault({
+      "a/bad.md": badContent,
+      "b/bad.md": badContent,
+    });
+
+    const warnings: string[] = [];
+    const captured: unknown[] = [];
+    const origLog = console.log;
+    const origError = console.error;
+
+    try {
+      console.error = (...args: unknown[]) => {
+        const msg = args.map(String).join(" ");
+        if (msg.includes("⚠")) warnings.push(msg);
+      };
+      console.log = (...args: unknown[]) => {
+        captured.push(...args);
+      };
+      await overview({
+        vault: vault.path,
+        json: true,
+        quiet: false,
+        copy: false,
+      });
+    } finally {
+      console.log = origLog;
+      console.error = origError;
+    }
+
+    expect(warnings.length).toBe(2);
+    expect(warnings.join("\n")).toContain("a/bad.md");
+    expect(warnings.join("\n")).toContain("b/bad.md");
+
+    // and neither file leaks tags from the unparsed frontmatter
+    const result = JSON.parse(captured[0] as string) as {
+      overview: Array<{ path: string; tags: string[] }>;
+    };
+    for (const folder of result.overview) {
+      expect(folder.tags).not.toContain("twin");
+      expect(folder.tags).not.toContain("copies");
+    }
+
+    vault.cleanup();
+  });
+
   test("empty vault", async () => {
     const vault = createTempVault({});
 

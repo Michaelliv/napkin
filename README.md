@@ -8,6 +8,11 @@ Every great idea started on a napkin.
 npm install -g napkin-ai
 ```
 
+Search runs on [ferrosearch](https://github.com/shift-labs-ai/ferrosearch),
+a native MiniSearch-compatible engine with prebuilt binaries for macOS
+(arm64, x64) and Linux (x64, arm64, glibc and musl). Other platforms build
+it from source with Rust installed.
+
 ---
 
 ## Quick Start
@@ -113,8 +118,9 @@ See [`bench/README.md`](bench/README.md) for details and usage.
 
 ```
 my-project/
-  .napkin/                  # napkin config
+  .napkin/                  # napkin config + caches
     config.json             # Unified config (syncs to .obsidian/)
+    *-cache.json            # Search/overview caches (auto-managed)
   .obsidian/                # Obsidian config (auto-generated)
   NAPKIN.md                 # Context note (Level 0)
   decisions/                # Template-defined directories
