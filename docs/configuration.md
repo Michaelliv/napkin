@@ -18,6 +18,7 @@ napkin config set --key search.limit --value 50
 |-----|---------|-------------|
 | `overview.depth` | `3` | Max folder depth in vault map |
 | `overview.keywords` | `8` | Max TF-IDF keywords per folder |
+| `overview.collapse` | `true` | Roll up numerous, lexically similar sibling folders into one row |
 
 ### search
 
@@ -64,8 +65,13 @@ CLI flags > `config.json` > hardcoded defaults
 ```
 project/
   .napkin/
-    config.json       # This file
-    .obsidian/        # Auto-synced from config.json
+    config.json            # This file
+    search-cache.json      # Search index cache (auto-managed)
+    overview-cache.json    # Overview result cache (auto-managed)
+    .obsidian/             # Auto-synced from config.json
 ```
+
+The cache files are keyed by a fingerprint of vault file mtimes and rebuild
+automatically; they are safe to delete at any time.
 
 Config is created on first `napkin config set` or `napkin init`. If the file doesn't exist, defaults are used.
