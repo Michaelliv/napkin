@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
-import { createRequire } from "node:module";
 import { Command } from "commander";
+// A static JSON import bundles into compiled binaries (`build:bun`), where
+// a runtime require("../package.json") cannot resolve.
+import packageJson from "../package.json" with { type: "json" };
 import { aliases } from "./commands/aliases.js";
 import { baseCreate, baseQuery, bases, baseViews } from "./commands/bases.js";
 import { bookmark, bookmarks } from "./commands/bookmarks.js";
@@ -61,8 +63,7 @@ import { update } from "./commands/update.js";
 import { vault } from "./commands/vault.js";
 import { wordcount } from "./commands/wordcount.js";
 
-const require = createRequire(import.meta.url);
-const { version } = require("../package.json");
+const { version } = packageJson;
 
 const program = new Command();
 
