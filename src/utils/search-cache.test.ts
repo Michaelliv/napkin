@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import MiniSearch from "minisearch";
+import { searchVault } from "../core/search.js";
 import {
   computeFingerprint,
   loadSearchCache,
@@ -113,5 +115,51 @@ describe("saveSearchCache / loadSearchCache", () => {
 
     const loaded = loadSearchCache(vault.vaultPath, "any");
     expect(loaded).toBeNull();
+  });
+});
+
+describe("minisearch cache migration", () => {
+  test("a cache blob written by minisearch loads and searches identically", () => {
+    // Vaults in the wild have search-cache.json blobs serialized by
+    // minisearch (napkin < ferrosearch swap). ferrosearch reads the same
+    // version-2 format, so old caches must keep working without a rebuild.
+    const fresh = searchVault(vault.vaultPath, vault.vaultPath, "alpha");
+    expect(fresh.length).toBeGreaterThan(0);
+
+    const files = ["README.md", "Projects/alpha.md", "Projects/beta.md"];
+    const legacy = new MiniSearch({
+      fields: ["basename", "content"],
+      storeFields: ["file"],
+      searchOptions: { boost: { basename: 2 }, fuzzy: 0.2, prefix: true },
+    });
+    legacy.addAll(
+      files.map((file, id) => ({
+        id,
+        file,
+        basename: path.basename(file, ".md"),
+        content: fs.readFileSync(path.join(vault.vaultPath, file), "utf-8"),
+      })),
+    );
+
+    saveSearchCache(vault.vaultPath, {
+      fingerprint: computeFingerprint(vault.vaultPath),
+      index: JSON.stringify(legacy), // the old serialization call
+      docs: files.map((file, id) => ({
+        id,
+        file,
+        basename: path.basename(file, ".md"),
+        mtime: fs.statSync(path.join(vault.vaultPath, file)).mtimeMs,
+      })),
+      backlinkCounts: {},
+    });
+
+    const fromLegacyCache = searchVault(
+      vault.vaultPath,
+      vault.vaultPath,
+      "alpha",
+    );
+    expect(fromLegacyCache.map((r) => [r.file, r.score])).toEqual(
+      fresh.map((r) => [r.file, r.score]),
+    );
   });
 });
