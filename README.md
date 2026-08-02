@@ -155,6 +155,11 @@ napkin search "auth" --json     # Ranked results as JSON
 napkin read "Note" -q           # Raw markdown, nothing else
 ```
 
+The package ships two agent skills in `skills/` — **distill** (turn a working
+session into vault notes: gate, dedup via search, merge over create) and
+**tend** (periodic upkeep: broken links, orphans, duplicates, tag sprawl).
+Point your agent's skill loader at them or copy them into its skills directory.
+
 ---
 
 ## CLI Reference
