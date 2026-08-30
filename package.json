@@ -1,7 +1,7 @@
 {
   "name": "napkin-ai",
-  "version": "0.9.2",
-  "description": "🧻 Knowledge system for agents. Local-first, file-based, progressively disclosed.",
+  "version": "0.10.0",
+  "description": "\ud83e\uddfb Knowledge system for agents. Local-first, file-based, progressively disclosed.",
   "type": "module",
   "main": "dist/index.js",
   "exports": {
