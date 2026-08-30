@@ -335,10 +335,10 @@ Core modules never call `console.log`, `process.exit`, or import output utilitie
 
 ## Pi Integration
 
-For [pi](https://github.com/badlogic/pi) users, install [pi-napkin](https://github.com/Michaelliv/pi-napkin) — vault context injection, `kb_search`/`kb_read` tools, and automatic distillation.
+For [pi](https://github.com/badlogic/pi-mono) users, install [pi-napkin](https://github.com/Michaelliv/pi-napkin) — vault context injection, `kb_search`/`kb_read` tools, and automatic distillation.
 
 ```bash
-pi install git:github.com/Michaelliv/pi-napkin
+pi install npm:pi-napkin
 ```
 
 ---
