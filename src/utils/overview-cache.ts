@@ -1,7 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-
-const CACHE_FILE = "overview-cache.json";
+import { OVERVIEW_CACHE_FILE } from "./vault-internals.js";
 
 export interface OverviewCacheData<T> {
   /** Whole-vault fingerprint (file paths + mtimes), see computeFingerprint. */
@@ -25,7 +24,10 @@ export function loadOverviewCache<T>(
   optionsKey: string,
 ): T | null {
   try {
-    const raw = fs.readFileSync(path.join(configPath, CACHE_FILE), "utf-8");
+    const raw = fs.readFileSync(
+      path.join(configPath, OVERVIEW_CACHE_FILE),
+      "utf-8",
+    );
     const data: OverviewCacheData<T> = JSON.parse(raw);
     if (data.fingerprint !== fingerprint) return null;
     if (data.optionsKey !== optionsKey) return null;
@@ -39,5 +41,8 @@ export function saveOverviewCache<T>(
   configPath: string,
   data: OverviewCacheData<T>,
 ): void {
-  fs.writeFileSync(path.join(configPath, CACHE_FILE), JSON.stringify(data));
+  fs.writeFileSync(
+    path.join(configPath, OVERVIEW_CACHE_FILE),
+    JSON.stringify(data),
+  );
 }

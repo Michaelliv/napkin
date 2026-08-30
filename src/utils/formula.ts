@@ -105,6 +105,13 @@ export function obsidianToJexl(expr: string): string {
 /**
  * Create a configured jexl instance with all Obsidian Bases functions.
  */
+/** Truncate a timestamp to the start of its day, in epoch ms. */
+export function startOfDayMs(ts: number): number {
+  const d = new Date(ts);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
 export function createFormulaEngine(): InstanceType<typeof Jexl.Jexl> {
   const jexl = new Jexl.Jexl();
 
@@ -115,11 +122,7 @@ export function createFormulaEngine(): InstanceType<typeof Jexl.Jexl> {
       cond ? trueVal : (falseVal ?? null),
   );
   jexl.addFunction("now", () => Date.now());
-  jexl.addFunction("today", () => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d.getTime();
-  });
+  jexl.addFunction("today", () => startOfDayMs(Date.now()));
   jexl.addFunction("date", (s: string) => new Date(s).getTime());
   jexl.addFunction("duration", (s: string) => parseDurationMs(s));
   jexl.addFunction("min", (...args: number[]) => Math.min(...args));
@@ -199,37 +202,12 @@ export function createFormulaEngine(): InstanceType<typeof Jexl.Jexl> {
       .replace("mm", String(d.getMinutes()).padStart(2, "0"))
       .replace("ss", String(d.getSeconds()).padStart(2, "0"));
   });
-  jexl.addTransform("date", (v: number) => {
-    const d = new Date(v);
-    d.setHours(0, 0, 0, 0);
-    return d.getTime();
-  });
+  jexl.addTransform("date", (v: number) => startOfDayMs(v));
   jexl.addTransform("time", (v: number) => {
     const d = new Date(v);
     return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
   });
-  jexl.addTransform("relative", (v: number) => {
-    const diff = Date.now() - v;
-    const abs = Math.abs(diff);
-    const ago = diff > 0;
-    if (abs < 60000) return "just now";
-    if (abs < 3600000) {
-      const m = Math.floor(abs / 60000);
-      return ago
-        ? `${m} minute${m > 1 ? "s" : ""} ago`
-        : `in ${m} minute${m > 1 ? "s" : ""}`;
-    }
-    if (abs < 86400000) {
-      const h = Math.floor(abs / 3600000);
-      return ago
-        ? `${h} hour${h > 1 ? "s" : ""} ago`
-        : `in ${h} hour${h > 1 ? "s" : ""}`;
-    }
-    const d = Math.floor(abs / 86400000);
-    return ago
-      ? `${d} day${d > 1 ? "s" : ""} ago`
-      : `in ${d} day${d > 1 ? "s" : ""}`;
-  });
+  jexl.addTransform("relative", relativeTime);
 
   // === Date field transforms (act as property access) ===
   jexl.addTransform("_year", (v: number) => new Date(v).getFullYear());
@@ -334,6 +312,60 @@ export function createFormulaEngine(): InstanceType<typeof Jexl.Jexl> {
   return jexl;
 }
 
+/** Human-relative time: "just now", "5 minutes ago", "in 2 days". */
+function relativeTime(v: number): string {
+  const diff = Date.now() - v;
+  const abs = Math.abs(diff);
+  if (abs < 60000) return "just now";
+  const [n, word] =
+    abs < 3600000
+      ? [Math.floor(abs / 60000), "minute"]
+      : abs < 86400000
+        ? [Math.floor(abs / 3600000), "hour"]
+        : [Math.floor(abs / 86400000), "day"];
+  const label = `${n} ${word}${n > 1 ? "s" : ""}`;
+  return diff > 0 ? `${label} ago` : `in ${label}`;
+}
+
+const FILE_META_COLS = new Set([
+  "path",
+  "name",
+  "basename",
+  "folder",
+  "ext",
+  "size",
+  "ctime",
+  "mtime",
+]);
+
+// JSON-serialized file columns and their parse-failure fallbacks.
+const FILE_JSON_COLS: Record<string, { key: string; fallback: unknown }> = {
+  tags: { key: "tags", fallback: [] },
+  links: { key: "links", fallback: [] },
+  backlinks: { key: "backlinks", fallback: [] },
+  embeds: { key: "embeds", fallback: [] },
+  file_properties: { key: "properties", fallback: {} },
+};
+
+function parseJsonOr(val: unknown, fallback: unknown): unknown {
+  try {
+    return JSON.parse(val as string);
+  } catch {
+    return fallback;
+  }
+}
+
+/** JSON lists/objects parse; everything else stays as-is. */
+function parseMaybeJson(val: unknown): unknown {
+  if (typeof val !== "string") return val;
+  try {
+    const p = JSON.parse(val);
+    return typeof p === "object" ? p : val;
+  } catch {
+    return val;
+  }
+}
+
 /**
  * Build a context object for formula evaluation from a database row.
  */
@@ -351,71 +383,21 @@ export function buildFormulaContext(
     const col = columns[i];
     const val = row[i];
 
-    // File metadata columns
-    if (
-      [
-        "path",
-        "name",
-        "basename",
-        "folder",
-        "ext",
-        "size",
-        "ctime",
-        "mtime",
-      ].includes(col)
-    ) {
+    if (FILE_META_COLS.has(col)) {
       file[col] = val;
-    } else if (col === "tags") {
-      try {
-        file.tags = JSON.parse(val as string);
-      } catch {
-        file.tags = [];
-      }
-    } else if (col === "links") {
-      try {
-        file.links = JSON.parse(val as string);
-      } catch {
-        file.links = [];
-      }
-    } else if (col === "backlinks") {
-      try {
-        file.backlinks = JSON.parse(val as string);
-      } catch {
-        file.backlinks = [];
-      }
-    } else if (col === "embeds") {
-      try {
-        file.embeds = JSON.parse(val as string);
-      } catch {
-        file.embeds = [];
-      }
-    } else if (col === "file_properties") {
-      try {
-        file.properties = JSON.parse(val as string);
-      } catch {
-        file.properties = {};
-      }
+    } else if (col in FILE_JSON_COLS) {
+      const { key, fallback } = FILE_JSON_COLS[col];
+      file[key] = parseJsonOr(val, fallback);
     } else {
-      // Frontmatter properties (already stripped of prop_ prefix by queryBase)
-      // Try to parse JSON values (lists, objects)
-      let parsed = val;
-      if (typeof val === "string") {
-        try {
-          const p = JSON.parse(val);
-          if (typeof p === "object") parsed = p;
-        } catch {
-          /* keep as string */
-        }
-      }
+      // Frontmatter properties (already stripped of prop_ prefix by
+      // queryBase); bare property access doubles as shorthand.
+      const parsed = parseMaybeJson(val);
       note[col] = parsed;
-      ctx[col] = parsed; // bare property access shorthand
+      ctx[col] = parsed;
     }
   }
 
-  // Add formula results
-  const formula: Record<string, unknown> = { ...formulaResults };
-  ctx.formula = formula;
-
+  ctx.formula = { ...formulaResults };
   ctx.file = file;
   ctx.note = note;
   if (thisFile) ctx.this = { file: thisFile };
@@ -470,42 +452,37 @@ export async function evaluateFormulas(
   return results;
 }
 
-function parseDurationMs(dur: string): number {
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
+const DURATION_UNIT_MS: Record<string, number> = {
+  y: 365.25 * DAY_MS,
+  year: 365.25 * DAY_MS,
+  years: 365.25 * DAY_MS,
+  M: 30.44 * DAY_MS,
+  month: 30.44 * DAY_MS,
+  months: 30.44 * DAY_MS,
+  w: 7 * DAY_MS,
+  week: 7 * DAY_MS,
+  weeks: 7 * DAY_MS,
+  d: DAY_MS,
+  day: DAY_MS,
+  days: DAY_MS,
+  h: HOUR_MS,
+  hour: HOUR_MS,
+  hours: HOUR_MS,
+  m: 60 * 1000,
+  minute: 60 * 1000,
+  minutes: 60 * 1000,
+  s: 1000,
+  second: 1000,
+  seconds: 1000,
+};
+
+/** Parse a duration string ("7d", "1 week", "2h") into milliseconds. */
+export function parseDurationMs(dur: string): number {
   const match = dur.match(
     /^(\d+)\s*(y|year|years|M|month|months|d|day|days|w|week|weeks|h|hour|hours|m|minute|minutes|s|second|seconds)$/,
   );
   if (!match) return 0;
-  const n = Number.parseInt(match[1], 10);
-  switch (match[2]) {
-    case "y":
-    case "year":
-    case "years":
-      return n * 365.25 * 24 * 60 * 60 * 1000;
-    case "M":
-    case "month":
-    case "months":
-      return n * 30.44 * 24 * 60 * 60 * 1000;
-    case "w":
-    case "week":
-    case "weeks":
-      return n * 7 * 24 * 60 * 60 * 1000;
-    case "d":
-    case "day":
-    case "days":
-      return n * 24 * 60 * 60 * 1000;
-    case "h":
-    case "hour":
-    case "hours":
-      return n * 60 * 60 * 1000;
-    case "m":
-    case "minute":
-    case "minutes":
-      return n * 60 * 1000;
-    case "s":
-    case "second":
-    case "seconds":
-      return n * 1000;
-    default:
-      return 0;
-  }
+  return Number.parseInt(match[1], 10) * (DURATION_UNIT_MS[match[2]] ?? 0);
 }

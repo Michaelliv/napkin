@@ -4,7 +4,7 @@ import * as path from "node:path";
 import { createTempVault } from "../utils/test-helpers.js";
 import { task, tasks } from "./tasks.js";
 
-let v: { path: string; vaultPath: string; cleanup: () => void };
+let v: ReturnType<typeof createTempVault>;
 
 async function captureJson(
   fn: () => Promise<void>,
@@ -38,13 +38,15 @@ afterEach(() => {
 
 describe("tasks", () => {
   test("lists all tasks", async () => {
-    const data = await captureJson(() => tasks({ json: true, vault: v.path }));
+    const data = await captureJson(() =>
+      tasks({ json: true, vault: v.projectPath }),
+    );
     expect((data.tasks as unknown[]).length).toBe(6);
   });
 
   test("filters todo only", async () => {
     const data = await captureJson(() =>
-      tasks({ json: true, vault: v.path, todo: true }),
+      tasks({ json: true, vault: v.projectPath, todo: true }),
     );
     const t = data.tasks as { done: boolean }[];
     expect(t.every((x) => !x.done)).toBe(true);
@@ -52,7 +54,7 @@ describe("tasks", () => {
 
   test("filters done only", async () => {
     const data = await captureJson(() =>
-      tasks({ json: true, vault: v.path, done: true }),
+      tasks({ json: true, vault: v.projectPath, done: true }),
     );
     const t = data.tasks as { done: boolean }[];
     expect(t.every((x) => x.done)).toBe(true);
@@ -60,28 +62,28 @@ describe("tasks", () => {
 
   test("filters by file", async () => {
     const data = await captureJson(() =>
-      tasks({ json: true, vault: v.path, file: "note" }),
+      tasks({ json: true, vault: v.projectPath, file: "note" }),
     );
     expect((data.tasks as unknown[]).length).toBe(3);
   });
 
   test("filters daily tasks", async () => {
     const data = await captureJson(() =>
-      tasks({ json: true, vault: v.path, daily: true }),
+      tasks({ json: true, vault: v.projectPath, daily: true }),
     );
     expect((data.tasks as unknown[]).length).toBe(2);
   });
 
   test("returns total", async () => {
     const data = await captureJson(() =>
-      tasks({ json: true, vault: v.path, total: true }),
+      tasks({ json: true, vault: v.projectPath, total: true }),
     );
     expect(data.total).toBe(6);
   });
 
   test("filters by status char", async () => {
     const data = await captureJson(() =>
-      tasks({ json: true, vault: v.path, status: "-" }),
+      tasks({ json: true, vault: v.projectPath, status: "-" }),
     );
     const t = data.tasks as { status: string }[];
     expect(t.length).toBe(1);
@@ -92,7 +94,7 @@ describe("tasks", () => {
 describe("task", () => {
   test("shows task info", async () => {
     const data = await captureJson(() =>
-      task({ json: true, vault: v.path, file: "note", line: "2" }),
+      task({ json: true, vault: v.projectPath, file: "note", line: "2" }),
     );
     expect(data.status).toBe(" ");
     expect(data.text).toBe("Buy groceries");
@@ -102,35 +104,56 @@ describe("task", () => {
     await captureJson(() =>
       task({
         json: true,
-        vault: v.path,
+        vault: v.projectPath,
         file: "note",
         line: "2",
         toggle: true,
       }),
     );
-    const content = fs.readFileSync(path.join(v.vaultPath, "note.md"), "utf-8");
+    const content = fs.readFileSync(
+      path.join(v.contentPath, "note.md"),
+      "utf-8",
+    );
     expect(content).toContain("[x] Buy groceries");
   });
 
   test("marks task done", async () => {
     await captureJson(() =>
-      task({ json: true, vault: v.path, file: "note", line: "2", done: true }),
+      task({
+        json: true,
+        vault: v.projectPath,
+        file: "note",
+        line: "2",
+        done: true,
+      }),
     );
-    const content = fs.readFileSync(path.join(v.vaultPath, "note.md"), "utf-8");
+    const content = fs.readFileSync(
+      path.join(v.contentPath, "note.md"),
+      "utf-8",
+    );
     expect(content).toContain("[x] Buy groceries");
   });
 
   test("marks task todo", async () => {
     await captureJson(() =>
-      task({ json: true, vault: v.path, file: "note", line: "3", todo: true }),
+      task({
+        json: true,
+        vault: v.projectPath,
+        file: "note",
+        line: "3",
+        todo: true,
+      }),
     );
-    const content = fs.readFileSync(path.join(v.vaultPath, "note.md"), "utf-8");
+    const content = fs.readFileSync(
+      path.join(v.contentPath, "note.md"),
+      "utf-8",
+    );
     expect(content).toContain("[ ] Ship feature");
   });
 
   test("uses ref format", async () => {
     const data = await captureJson(() =>
-      task({ json: true, vault: v.path, ref: "note.md:2" }),
+      task({ json: true, vault: v.projectPath, ref: "note.md:2" }),
     );
     expect(data.text).toBe("Buy groceries");
   });

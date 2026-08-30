@@ -14,15 +14,18 @@ bun run check                # Biome lint + format
 
 - `src/main.ts` — Commander entry point, global --json/--quiet/--vault/--copy flags
 - `src/commands/` — One file per command group
+- `src/core/tokenizer.ts` — Overview tokenizer (noise stripping, stopwords, term counts)
 - `src/templates/` — Vault template definitions (coding, personal, research, company, product)
 - `src/utils/output.ts` — Chalk output helpers, triple output (json/quiet/human)
 - `src/utils/exit-codes.ts` — Standardized exit codes
 - `src/utils/vault.ts` — Vault discovery (walks up from cwd looking for .napkin/)
+- `src/utils/vault-internals.ts` — Owner of napkin-internal files + skip directories
 - `src/utils/files.ts` — File listing, resolution (wikilink-style name or exact path)
 - `src/utils/frontmatter.ts` — YAML frontmatter parse/set/remove
 - `src/utils/config.ts` — Unified config (load/save/update, syncs to .obsidian/)
 - `src/utils/markdown.ts` — Extract headings, tasks, tags, links from markdown
-- `src/utils/search-cache.ts` — Search index cache + whole-vault mtime fingerprint
+- `src/utils/fingerprint.ts` — Whole-vault mtime fingerprint (keys both caches)
+- `src/utils/search-cache.ts` — Search index cache
 - `src/utils/overview-cache.ts` — Overview result cache (fingerprint + options key)
 - `skills/` — Agent skills shipped in the npm package: `distill` (conversation → vault notes) and `tend` (periodic vault upkeep)
 
@@ -62,7 +65,7 @@ project/
 | Level | Command | What it does |
 |-------|---------|-------------|
 | L0 | `NAPKIN.md` | Always-loaded context (rendered in overview) |
-| L1 | `napkin overview` | Vault map with TF-IDF keywords per folder |
+| L1 | `napkin overview` | Vault map with search-validated domain keywords per folder |
 | L2 | `napkin search <query>` | BM25 + backlinks + recency ranked results with snippets |
 | L3 | `napkin read <file>` | Full file content |
 

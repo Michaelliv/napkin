@@ -3,14 +3,12 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import MiniSearch from "minisearch";
 import { searchVault } from "../core/search.js";
-import {
-  computeFingerprint,
-  loadSearchCache,
-  saveSearchCache,
-} from "./search-cache.js";
+import { computeFingerprint } from "./fingerprint.js";
+import { loadSearchCache, saveSearchCache } from "./search-cache.js";
 import { createTempVault } from "./test-helpers.js";
+import { SEARCH_CACHE_FILE } from "./vault-internals.js";
 
-let vault: { path: string; vaultPath: string; cleanup: () => void };
+let vault: { projectPath: string; contentPath: string; cleanup: () => void };
 
 beforeEach(() => {
   vault = createTempVault({
@@ -24,41 +22,9 @@ afterEach(() => {
   vault.cleanup();
 });
 
-describe("computeFingerprint", () => {
-  test("returns consistent fingerprint for same files", () => {
-    const fp1 = computeFingerprint(vault.vaultPath);
-    const fp2 = computeFingerprint(vault.vaultPath);
-    expect(fp1).toBe(fp2);
-  });
-
-  test("changes when a file is added", () => {
-    const fp1 = computeFingerprint(vault.vaultPath);
-    fs.writeFileSync(path.join(vault.vaultPath, "new.md"), "# New");
-    const fp2 = computeFingerprint(vault.vaultPath);
-    expect(fp1).not.toBe(fp2);
-  });
-
-  test("changes when a file is modified", () => {
-    const fp1 = computeFingerprint(vault.vaultPath);
-    // Ensure mtime changes (some filesystems have 1s resolution)
-    const filePath = path.join(vault.vaultPath, "README.md");
-    const futureTime = Date.now() + 2000;
-    fs.utimesSync(filePath, futureTime / 1000, futureTime / 1000);
-    const fp2 = computeFingerprint(vault.vaultPath);
-    expect(fp1).not.toBe(fp2);
-  });
-
-  test("changes when a file is deleted", () => {
-    const fp1 = computeFingerprint(vault.vaultPath);
-    fs.unlinkSync(path.join(vault.vaultPath, "README.md"));
-    const fp2 = computeFingerprint(vault.vaultPath);
-    expect(fp1).not.toBe(fp2);
-  });
-});
-
 describe("saveSearchCache / loadSearchCache", () => {
   test("round-trips cache data", () => {
-    const fingerprint = computeFingerprint(vault.vaultPath);
+    const fingerprint = computeFingerprint(vault.contentPath);
     const data = {
       fingerprint,
       index: '{"serialized":"index"}',
@@ -66,8 +32,8 @@ describe("saveSearchCache / loadSearchCache", () => {
       backlinkCounts: { "README.md": 2 },
     };
 
-    saveSearchCache(vault.vaultPath, data);
-    const loaded = loadSearchCache(vault.vaultPath, fingerprint);
+    saveSearchCache(vault.contentPath, data);
+    const loaded = loadSearchCache(vault.contentPath, fingerprint);
 
     expect(loaded).not.toBeNull();
     expect(loaded?.index).toBe(data.index);
@@ -76,7 +42,7 @@ describe("saveSearchCache / loadSearchCache", () => {
   });
 
   test("returns null when no cache exists", () => {
-    const loaded = loadSearchCache(vault.vaultPath, "any-fingerprint");
+    const loaded = loadSearchCache(vault.contentPath, "any-fingerprint");
     expect(loaded).toBeNull();
   });
 
@@ -87,9 +53,9 @@ describe("saveSearchCache / loadSearchCache", () => {
       docs: [],
       backlinkCounts: {},
     };
-    saveSearchCache(vault.vaultPath, data);
+    saveSearchCache(vault.contentPath, data);
 
-    const loaded = loadSearchCache(vault.vaultPath, "new-fingerprint");
+    const loaded = loadSearchCache(vault.contentPath, "new-fingerprint");
     expect(loaded).toBeNull();
   });
 
@@ -100,20 +66,20 @@ describe("saveSearchCache / loadSearchCache", () => {
       docs: [],
       backlinkCounts: {},
     };
-    saveSearchCache(vault.vaultPath, data);
+    saveSearchCache(vault.contentPath, data);
 
-    expect(fs.existsSync(path.join(vault.vaultPath, "search-cache.json"))).toBe(
+    expect(fs.existsSync(path.join(vault.contentPath, SEARCH_CACHE_FILE))).toBe(
       true,
     );
   });
 
   test("returns null on corrupted cache file", () => {
     fs.writeFileSync(
-      path.join(vault.vaultPath, "search-cache.json"),
+      path.join(vault.contentPath, SEARCH_CACHE_FILE),
       "not valid json{{{",
     );
 
-    const loaded = loadSearchCache(vault.vaultPath, "any");
+    const loaded = loadSearchCache(vault.contentPath, "any");
     expect(loaded).toBeNull();
   });
 });
@@ -123,7 +89,7 @@ describe("minisearch cache migration", () => {
     // Vaults in the wild have search-cache.json blobs serialized by
     // minisearch (napkin < ferrosearch swap). ferrosearch reads the same
     // version-2 format, so old caches must keep working without a rebuild.
-    const fresh = searchVault(vault.vaultPath, vault.vaultPath, "alpha");
+    const fresh = searchVault(vault.contentPath, vault.contentPath, "alpha");
     expect(fresh.length).toBeGreaterThan(0);
 
     const files = ["README.md", "Projects/alpha.md", "Projects/beta.md"];
@@ -137,25 +103,25 @@ describe("minisearch cache migration", () => {
         id,
         file,
         basename: path.basename(file, ".md"),
-        content: fs.readFileSync(path.join(vault.vaultPath, file), "utf-8"),
+        content: fs.readFileSync(path.join(vault.contentPath, file), "utf-8"),
       })),
     );
 
-    saveSearchCache(vault.vaultPath, {
-      fingerprint: computeFingerprint(vault.vaultPath),
+    saveSearchCache(vault.contentPath, {
+      fingerprint: computeFingerprint(vault.contentPath),
       index: JSON.stringify(legacy), // the old serialization call
       docs: files.map((file, id) => ({
         id,
         file,
         basename: path.basename(file, ".md"),
-        mtime: fs.statSync(path.join(vault.vaultPath, file)).mtimeMs,
+        mtime: fs.statSync(path.join(vault.contentPath, file)).mtimeMs,
       })),
       backlinkCounts: {},
     });
 
     const fromLegacyCache = searchVault(
-      vault.vaultPath,
-      vault.vaultPath,
+      vault.contentPath,
+      vault.contentPath,
       "alpha",
     );
     expect(fromLegacyCache.map((r) => [r.file, r.score])).toEqual(

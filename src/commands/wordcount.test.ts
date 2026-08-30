@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { createTempVault } from "../utils/test-helpers.js";
 import { wordcount } from "./wordcount.js";
 
-let v: { path: string; vaultPath: string; cleanup: () => void };
+let v: ReturnType<typeof createTempVault>;
 
 async function captureJson(
   fn: () => Promise<void>,
@@ -29,7 +29,7 @@ afterEach(() => {
 describe("wordcount", () => {
   test("counts words and characters", async () => {
     const data = await captureJson(() =>
-      wordcount({ json: true, vault: v.path, file: "note" }),
+      wordcount({ json: true, vault: v.projectPath, file: "note" }),
     );
     expect(data.words).toBe(8);
     expect(data.characters as number).toBeGreaterThan(0);
@@ -37,7 +37,12 @@ describe("wordcount", () => {
 
   test("returns words only", async () => {
     const data = await captureJson(() =>
-      wordcount({ json: true, vault: v.path, file: "note", words: true }),
+      wordcount({
+        json: true,
+        vault: v.projectPath,
+        file: "note",
+        words: true,
+      }),
     );
     expect(data.words).toBe(8);
     expect(data.characters).toBeUndefined();
@@ -45,7 +50,12 @@ describe("wordcount", () => {
 
   test("returns characters only", async () => {
     const data = await captureJson(() =>
-      wordcount({ json: true, vault: v.path, file: "note", characters: true }),
+      wordcount({
+        json: true,
+        vault: v.projectPath,
+        file: "note",
+        characters: true,
+      }),
     );
     expect(data.characters).toBeGreaterThan(0);
     expect(data.words).toBeUndefined();

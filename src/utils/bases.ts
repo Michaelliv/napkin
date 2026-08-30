@@ -3,7 +3,12 @@ import * as path from "node:path";
 import yaml from "js-yaml";
 import initSqlJs, { type Database } from "sql.js";
 import { listFiles } from "./files.js";
-import { createFormulaEngine, evaluateFormulas } from "./formula.js";
+import {
+  createFormulaEngine,
+  evaluateFormulas,
+  parseDurationMs,
+  startOfDayMs,
+} from "./formula.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { extractLinks, extractTags } from "./markdown.js";
 
@@ -32,33 +37,29 @@ export function parseBaseFile(content: string): BaseConfig {
   return yaml.load(content) as BaseConfig;
 }
 
-/**
- * Build an in-memory SQLite database from vault files.
- * Creates a `files` table with columns for file metadata and all frontmatter properties.
- */
-export async function buildDatabase(vaultPath: string): Promise<Database> {
-  const SQL = await initSqlJs();
-  const db = new SQL.Database();
+interface BaseFileRow {
+  path: string;
+  name: string;
+  basename: string;
+  folder: string;
+  ext: string;
+  size: number;
+  ctime: number;
+  mtime: number;
+  tags: string;
+  links: string;
+  properties: Record<string, unknown>;
+}
 
-  const files = listFiles(vaultPath, { ext: "md" });
-
-  // First pass: collect all property names across the vault
+/** First pass: read every note, collecting rows and all property names. */
+function collectFileRows(vaultPath: string): {
+  fileData: BaseFileRow[];
+  allProps: Set<string>;
+} {
   const allProps = new Set<string>();
-  const fileData: {
-    path: string;
-    name: string;
-    basename: string;
-    folder: string;
-    ext: string;
-    size: number;
-    ctime: number;
-    mtime: number;
-    tags: string;
-    links: string;
-    properties: Record<string, unknown>;
-  }[] = [];
+  const fileData: BaseFileRow[] = [];
 
-  for (const file of files) {
+  for (const file of listFiles(vaultPath, { ext: "md" })) {
     const fullPath = path.join(vaultPath, file);
     const stat = fs.statSync(fullPath);
     const content = fs.readFileSync(fullPath, "utf-8");
@@ -90,6 +91,55 @@ export async function buildDatabase(vaultPath: string): Promise<Database> {
     });
   }
 
+  return { fileData, allProps };
+}
+
+/** For each file, which other files link to it (basename match, like wikilinks). */
+function computeBaseBacklinks(fileData: BaseFileRow[]): Map<string, string[]> {
+  const backlinkMap = new Map<string, string[]>();
+  for (const f of fileData) {
+    backlinkMap.set(f.path, []);
+  }
+  for (const f of fileData) {
+    const links: string[] = JSON.parse(f.links);
+    for (const link of links) {
+      const linkLower = link.toLowerCase();
+      for (const target of fileData) {
+        if (
+          target.basename.toLowerCase() === linkLower ||
+          target.name.toLowerCase() === linkLower ||
+          target.name.toLowerCase() === `${linkLower}.md`
+        ) {
+          const bl = backlinkMap.get(target.path) || [];
+          bl.push(f.basename);
+          backlinkMap.set(target.path, bl);
+        }
+      }
+    }
+  }
+  return backlinkMap;
+}
+
+const EMBED_RE = /!\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g;
+
+function extractEmbeds(content: string): string[] {
+  const embeds: string[] = [];
+  for (const m of content.matchAll(EMBED_RE)) {
+    embeds.push(m[1]);
+  }
+  return embeds;
+}
+
+/**
+ * Build an in-memory SQLite database from vault files.
+ * Creates a `files` table with columns for file metadata and all frontmatter properties.
+ */
+export async function buildDatabase(vaultPath: string): Promise<Database> {
+  const SQL = await initSqlJs();
+  const db = new SQL.Database();
+
+  const { fileData, allProps } = collectFileRows(vaultPath);
+
   // Create table with file columns + property columns
   const propCols = [...allProps].map((p) => `"prop_${p}" TEXT`).join(", ");
   const createSQL = `CREATE TABLE files (
@@ -119,33 +169,7 @@ export async function buildDatabase(vaultPath: string): Promise<Database> {
     }
   });
 
-  // Insert data
-  // Compute backlinks: for each file, find which other files link to it
-  const backlinkMap = new Map<string, string[]>();
-  for (const f of fileData) {
-    backlinkMap.set(f.path, []);
-  }
-  for (const f of fileData) {
-    const links: string[] = JSON.parse(f.links);
-    for (const link of links) {
-      // Find target file by basename match (case-insensitive, like wikilinks)
-      const linkLower = link.toLowerCase();
-      for (const target of fileData) {
-        if (
-          target.basename.toLowerCase() === linkLower ||
-          target.name.toLowerCase() === linkLower ||
-          target.name.toLowerCase() === `${linkLower}.md`
-        ) {
-          const bl = backlinkMap.get(target.path) || [];
-          bl.push(f.basename);
-          backlinkMap.set(target.path, bl);
-        }
-      }
-    }
-  }
-
-  // Extract embeds
-  const embedRegex = /!\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g;
+  const backlinkMap = computeBaseBacklinks(fileData);
 
   const propNames = [...allProps];
   // 13 base columns + N prop columns
@@ -177,19 +201,8 @@ export async function buildDatabase(vaultPath: string): Promise<Database> {
 
     const backlinks = JSON.stringify(backlinkMap.get(f.path) || []);
 
-    // Extract embeds from content
     const fullPath = path.join(vaultPath, f.path);
-    const content = fs.readFileSync(fullPath, "utf-8");
-    const embeds: string[] = [];
-    for (
-      let em = embedRegex.exec(content);
-      em !== null;
-      em = embedRegex.exec(content)
-    ) {
-      embeds.push(em[1]);
-    }
-    embedRegex.lastIndex = 0;
-
+    const embeds = extractEmbeds(fs.readFileSync(fullPath, "utf-8"));
     const fileProps = JSON.stringify(f.properties);
 
     db.run(insertSQL, [
@@ -284,6 +297,17 @@ function translateExpression(
     return splitByBoolOp;
   }
 
+  return (
+    translateFileFn(expr) ??
+    translateStringFn(expr) ??
+    translateComparison(expr) ??
+    // Fallback: treat as a property existence check
+    `"prop_${escapeSql(expr)}" IS NOT NULL`
+  );
+}
+
+/** file.hasTag / file.hasLink / file.inFolder / file.hasProperty. */
+function translateFileFn(expr: string): string | null {
   // file.hasTag("tag1", "tag2") -> OR match on tags JSON array
   const hasTagMatch = expr.match(/^file\.hasTag\((.+)\)$/);
   if (hasTagMatch) {
@@ -292,7 +316,6 @@ function translateExpression(
     return clauses.length === 1 ? clauses[0] : `(${clauses.join(" OR ")})`;
   }
 
-  // file.hasLink("target")
   const hasLinkMatch = expr.match(/^file\.hasLink\((.+)\)$/);
   if (hasLinkMatch) {
     const args = parseStringArgs(hasLinkMatch[1]);
@@ -300,19 +323,22 @@ function translateExpression(
     return clauses.length === 1 ? clauses[0] : `(${clauses.join(" OR ")})`;
   }
 
-  // file.inFolder("folder")
   const inFolderMatch = expr.match(/^file\.inFolder\("([^"]+)"\)$/);
   if (inFolderMatch) {
     const folder = inFolderMatch[1];
     return `(folder = '${escapeSql(folder)}' OR folder LIKE '${escapeSql(folder)}/%')`;
   }
 
-  // file.hasProperty("name")
   const hasPropMatch = expr.match(/^file\.hasProperty\("([^"]+)"\)$/);
   if (hasPropMatch) {
     return `"prop_${escapeSql(hasPropMatch[1])}" IS NOT NULL`;
   }
 
+  return null;
+}
+
+/** contains / containsAll / containsAny / startsWith / endsWith / isEmpty / regex. */
+function translateStringFn(expr: string): string | null {
   // prop.contains("value") — string LIKE
   const containsMatch = expr.match(/^(.+?)\.contains\((.+)\)$/);
   if (containsMatch && !containsMatch[1].startsWith("file.")) {
@@ -321,7 +347,6 @@ function translateExpression(
     if (args.length === 1) return `${prop} LIKE '%${escapeSql(args[0])}%'`;
   }
 
-  // prop.containsAll("a", "b")
   const containsAllMatch = expr.match(/^(.+?)\.containsAll\((.+)\)$/);
   if (containsAllMatch && !containsAllMatch[1].startsWith("file.")) {
     const prop = translateProperty(containsAllMatch[1].trim());
@@ -330,7 +355,6 @@ function translateExpression(
     return `(${clauses.join(" AND ")})`;
   }
 
-  // prop.containsAny("a", "b")
   const containsAnyMatch = expr.match(/^(.+?)\.containsAny\((.+)\)$/);
   if (containsAnyMatch && !containsAnyMatch[1].startsWith("file.")) {
     const prop = translateProperty(containsAnyMatch[1].trim());
@@ -339,21 +363,18 @@ function translateExpression(
     return `(${clauses.join(" OR ")})`;
   }
 
-  // prop.startsWith("value")
   const startsWithMatch = expr.match(/^(.+?)\.startsWith\("([^"]+)"\)$/);
   if (startsWithMatch) {
     const prop = translateProperty(startsWithMatch[1].trim());
     return `${prop} LIKE '${escapeSql(startsWithMatch[2])}%'`;
   }
 
-  // prop.endsWith("value")
   const endsWithMatch = expr.match(/^(.+?)\.endsWith\("([^"]+)"\)$/);
   if (endsWithMatch) {
     const prop = translateProperty(endsWithMatch[1].trim());
     return `${prop} LIKE '%${escapeSql(endsWithMatch[2])}'`;
   }
 
-  // prop.isEmpty()
   const isEmptyMatch = expr.match(/^(.+?)\.isEmpty\(\)$/);
   if (isEmptyMatch) {
     const prop = translateProperty(isEmptyMatch[1].trim());
@@ -363,31 +384,67 @@ function translateExpression(
   // /pattern/.matches(expr) — regex match
   const regexMatch = expr.match(/^\/(.+?)\/\.matches\((.+)\)$/);
   if (regexMatch) {
-    const pattern = regexMatch[1];
-    const target = regexMatch[2].trim();
-    const col = translateProperty(target);
-    return `${col} REGEXP '${escapeSql(pattern)}'`;
+    const col = translateProperty(regexMatch[2].trim());
+    return `${col} REGEXP '${escapeSql(regexMatch[1])}'`;
   }
 
-  // Comparison expressions: property op value
-  // e.g. status != "done", price > 2.1, file.ext == "md"
+  return null;
+}
+
+/** property op value — e.g. status != "done", price > 2.1, file.ext == "md". */
+function translateComparison(expr: string): string | null {
   const cmpMatch = expr.match(/^(.+?)\s*(==|!=|>=|<=|>|<)\s*(.+)$/);
-  if (cmpMatch) {
-    const leftRaw = cmpMatch[1].trim();
-    const rightRaw = cmpMatch[3].trim();
-    // Try resolving both sides as date expressions first
-    const leftDate = resolveDateExpr(leftRaw);
-    const rightDate = resolveDateExpr(rightRaw);
-    const left =
-      leftDate !== null ? String(leftDate) : translateProperty(leftRaw);
-    const op = cmpMatch[2] === "==" ? "=" : cmpMatch[2];
-    const right =
-      rightDate !== null ? String(rightDate) : translateValue(rightRaw);
-    return `${left} ${op} ${right}`;
-  }
+  if (!cmpMatch) return null;
+  const leftRaw = cmpMatch[1].trim();
+  const rightRaw = cmpMatch[3].trim();
+  // Try resolving both sides as date expressions first
+  const leftDate = resolveDateExpr(leftRaw);
+  const rightDate = resolveDateExpr(rightRaw);
+  const left =
+    leftDate !== null ? String(leftDate) : translateProperty(leftRaw);
+  const op = cmpMatch[2] === "==" ? "=" : cmpMatch[2];
+  const right =
+    rightDate !== null ? String(rightDate) : translateValue(rightRaw);
+  return `${left} ${op} ${right}`;
+}
 
-  // Fallback: treat as a property existence check
-  return `"prop_${escapeSql(expr)}" IS NOT NULL`;
+const boolOpAt = (expr: string, i: number): "AND" | "OR" | null => {
+  if (expr[i] === "&" && expr[i + 1] === "&") return "AND";
+  if (expr[i] === "|" && expr[i + 1] === "|") return "OR";
+  return null;
+};
+
+/** Per index: outside strings and parentheses, so operators count. */
+function topLevelMask(expr: string): boolean[] {
+  const mask: boolean[] = new Array(expr.length);
+  let depth = 0;
+  let inString: string | null = null;
+  for (let i = 0; i < expr.length; i++) {
+    const ch = expr[i];
+    if (inString) {
+      mask[i] = false;
+      if (ch === inString && expr[i - 1] !== "\\") inString = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'") inString = ch;
+    else if (ch === "(") depth++;
+    else if (ch === ")") depth--;
+    mask[i] = depth === 0 && inString === null;
+  }
+  return mask;
+}
+
+/** First top-level && or || outside strings and parentheses, or null. */
+function findTopLevelBoolOp(
+  expr: string,
+): { idx: number; op: "AND" | "OR" } | null {
+  const mask = topLevelMask(expr);
+  for (let i = 0; i < expr.length; i++) {
+    if (!mask[i]) continue;
+    const op = boolOpAt(expr, i);
+    if (op) return { idx: i, op };
+  }
+  return null;
 }
 
 /**
@@ -398,43 +455,11 @@ function splitOnBooleanOps(
   expr: string,
   thisFile?: { name: string; path: string; folder: string },
 ): string | null {
-  let depth = 0;
-  let inString: string | null = null;
-
-  // Find top-level && or ||
-  for (let i = 0; i < expr.length; i++) {
-    const ch = expr[i];
-    if (inString) {
-      if (ch === inString && expr[i - 1] !== "\\") inString = null;
-      continue;
-    }
-    if (ch === '"' || ch === "'") {
-      inString = ch;
-      continue;
-    }
-    if (ch === "(") {
-      depth++;
-      continue;
-    }
-    if (ch === ")") {
-      depth--;
-      continue;
-    }
-
-    if (depth === 0) {
-      if (expr[i] === "&" && expr[i + 1] === "&") {
-        const left = translateExpression(expr.slice(0, i).trim(), thisFile);
-        const right = translateExpression(expr.slice(i + 2).trim(), thisFile);
-        return `(${left} AND ${right})`;
-      }
-      if (expr[i] === "|" && expr[i + 1] === "|") {
-        const left = translateExpression(expr.slice(0, i).trim(), thisFile);
-        const right = translateExpression(expr.slice(i + 2).trim(), thisFile);
-        return `(${left} OR ${right})`;
-      }
-    }
-  }
-  return null;
+  const found = findTopLevelBoolOp(expr);
+  if (!found) return null;
+  const left = translateExpression(expr.slice(0, found.idx).trim(), thisFile);
+  const right = translateExpression(expr.slice(found.idx + 2).trim(), thisFile);
+  return `(${left} ${found.op} ${right})`;
 }
 
 function translateProperty(prop: string): string {
@@ -478,101 +503,31 @@ function translateValue(val: string): string {
   return translateProperty(val);
 }
 
-/**
- * Parse duration string like "7d", "1 week", "2h" into milliseconds.
- */
-function parseDuration(dur: string): number {
-  const match = dur.match(
-    /^(\d+)\s*(y|year|years|M|month|months|d|day|days|w|week|weeks|h|hour|hours|m|minute|minutes|s|second|seconds)$/,
-  );
-  if (!match) return 0;
-  const n = Number.parseInt(match[1], 10);
-  const unit = match[2];
-  switch (unit) {
-    case "y":
-    case "year":
-    case "years":
-      return n * 365.25 * 24 * 60 * 60 * 1000;
-    case "M":
-    case "month":
-    case "months":
-      return n * 30.44 * 24 * 60 * 60 * 1000;
-    case "w":
-    case "week":
-    case "weeks":
-      return n * 7 * 24 * 60 * 60 * 1000;
-    case "d":
-    case "day":
-    case "days":
-      return n * 24 * 60 * 60 * 1000;
-    case "h":
-    case "hour":
-    case "hours":
-      return n * 60 * 60 * 1000;
-    case "m":
-    case "minute":
-    case "minutes":
-      return n * 60 * 1000;
-    case "s":
-    case "second":
-    case "seconds":
-      return n * 1000;
-    default:
-      return 0;
-  }
-}
-
-/**
- * Resolve date expressions to epoch milliseconds.
- * Handles: now(), today(), date("..."), and arithmetic like now() - "7d"
- * Returns null if not a date expression.
- */
-function resolveDateExpr(expr: string): number | null {
-  expr = expr.trim();
-
-  // now() +/- "duration"
-  const nowArith = expr.match(/^now\(\)\s*([+-])\s*"([^"]+)"$/);
-  if (nowArith) {
-    const ms = parseDuration(nowArith[2]);
-    return nowArith[1] === "+" ? Date.now() + ms : Date.now() - ms;
-  }
-
-  // today() +/- "duration"
-  const todayArith = expr.match(/^today\(\)\s*([+-])\s*"([^"]+)"$/);
-  if (todayArith) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const ms = parseDuration(todayArith[2]);
-    return todayArith[1] === "+" ? today.getTime() + ms : today.getTime() - ms;
-  }
-
-  // date("...") +/- "duration"
-  const dateArith = expr.match(/^date\("([^"]+)"\)\s*([+-])\s*"([^"]+)"$/);
-  if (dateArith) {
-    const ts = new Date(dateArith[1]).getTime();
-    if (Number.isNaN(ts)) return null;
-    const ms = parseDuration(dateArith[3]);
-    return dateArith[2] === "+" ? ts + ms : ts - ms;
-  }
-
-  // now()
+/** now() / today() / date("...") as epoch ms, or null. */
+function resolveDateBase(expr: string): number | null {
   if (expr === "now()") return Date.now();
-
-  // today()
-  if (expr === "today()") {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return today.getTime();
-  }
-
-  // date("...")
+  if (expr === "today()") return startOfDayMs(Date.now());
   const dateMatch = expr.match(/^date\("([^"]+)"\)$/);
   if (dateMatch) {
     const ts = new Date(dateMatch[1]).getTime();
     return Number.isNaN(ts) ? null : ts;
   }
-
   return null;
+}
+
+function resolveDateExpr(expr: string): number | null {
+  expr = expr.trim();
+
+  // <base> +/- "duration"
+  const arith = expr.match(/^(.+?)\s*([+-])\s*"([^"]+)"$/);
+  if (arith) {
+    const base = resolveDateBase(arith[1].trim());
+    if (base === null) return null;
+    const ms = parseDurationMs(arith[3]);
+    return arith[2] === "+" ? base + ms : base - ms;
+  }
+
+  return resolveDateBase(expr);
 }
 
 function parseStringArgs(argsStr: string): string[] {
@@ -595,6 +550,86 @@ export function orderToSQL(order?: string[]): string {
   if (!order || order.length === 0) return "";
   const cols = order.map((o) => translateProperty(o));
   return `ORDER BY ${cols.join(", ")}`;
+}
+
+/** Column index for a property, accepting the bare name or note.-prefixed. */
+function findColumn(columns: string[], prop: string): number {
+  const direct = columns.indexOf(prop);
+  if (direct !== -1) return direct;
+  return columns.indexOf(prop.startsWith("note.") ? prop.slice(5) : prop);
+}
+
+/** Evaluate base formulas per row, appending formula.* columns in place. */
+async function appendFormulaColumns(
+  columns: string[],
+  rows: unknown[][],
+  formulas: Record<string, string>,
+  thisFile?: { name: string; path: string; folder: string },
+): Promise<unknown[][]> {
+  const engine = createFormulaEngine();
+  const newRows: unknown[][] = [];
+  for (const row of rows) {
+    const formulaResults = await evaluateFormulas(
+      engine,
+      formulas,
+      columns,
+      row,
+      thisFile,
+    );
+    newRows.push([...row, ...Object.values(formulaResults)]);
+  }
+  columns.push(...Object.keys(formulas).map((k) => `formula.${k}`));
+  return newRows;
+}
+
+function groupRows(
+  view: BaseView | undefined,
+  columns: string[],
+  rows: unknown[][],
+): { key: string; rows: unknown[][] }[] | undefined {
+  if (!view?.groupBy) return undefined;
+  const groupIdx = findColumn(columns, view.groupBy.property);
+  if (groupIdx === -1) return undefined;
+
+  const groupMap = new Map<string, unknown[][]>();
+  for (const row of rows) {
+    const key = String(row[groupIdx] ?? "(empty)");
+    if (!groupMap.has(key)) groupMap.set(key, []);
+    groupMap.get(key)?.push(row);
+  }
+  const groups = [...groupMap.entries()].map(([key, rows]) => ({ key, rows }));
+  if (view.groupBy.direction === "DESC") groups.reverse();
+  return groups;
+}
+
+function computeViewSummaries(
+  view: BaseView | undefined,
+  columns: string[],
+  rows: unknown[][],
+  baseConfig: BaseConfig,
+): Record<string, unknown> | undefined {
+  const viewSummaries = view?.summaries as Record<string, string> | undefined;
+  if (!viewSummaries) return undefined;
+  const summaries: Record<string, unknown> = {};
+  for (const [prop, fn] of Object.entries(viewSummaries)) {
+    const colIdx = findColumn(columns, prop);
+    if (colIdx === -1) continue;
+    const values = rows
+      .map((r: unknown[]) => r[colIdx])
+      .filter((v: unknown) => v !== null && v !== undefined);
+    summaries[prop] = computeSummary(fn, values, baseConfig);
+  }
+  return summaries;
+}
+
+function buildDisplayNames(baseConfig: BaseConfig): Record<string, string> {
+  const displayNames: Record<string, string> = {};
+  for (const [key, config] of Object.entries(baseConfig.properties ?? {})) {
+    if (config.displayName) {
+      displayNames[key] = config.displayName;
+    }
+  }
+  return displayNames;
 }
 
 /**
@@ -636,81 +671,18 @@ export async function queryBase(
     );
     let rows = result[0].values;
 
-    // Evaluate formulas if any
     const formulas = baseConfig.formulas;
     if (formulas && Object.keys(formulas).length > 0) {
-      const engine = createFormulaEngine();
-      const formulaNames = Object.keys(formulas).map((k) => `formula.${k}`);
-
-      const newRows: unknown[][] = [];
-      for (const row of rows) {
-        const formulaResults = await evaluateFormulas(
-          engine,
-          formulas,
-          columns,
-          row,
-          thisFile,
-        );
-        const newRow = [...row, ...Object.values(formulaResults)];
-        newRows.push(newRow);
-      }
-      columns.push(...formulaNames);
-      rows = newRows;
+      rows = await appendFormulaColumns(columns, rows, formulas, thisFile);
     }
 
-    // Build displayName mapping
-    const displayNames: Record<string, string> = {};
-    if (baseConfig.properties) {
-      for (const [key, config] of Object.entries(baseConfig.properties)) {
-        if (config.displayName) {
-          displayNames[key] = config.displayName;
-        }
-      }
-    }
-
-    // GroupBy
-    let groups: { key: string; rows: unknown[][] }[] | undefined;
-    if (view?.groupBy) {
-      const groupProp = view.groupBy.property;
-      const groupIdx =
-        columns.indexOf(groupProp) !== -1
-          ? columns.indexOf(groupProp)
-          : columns.indexOf(
-              groupProp.startsWith("note.") ? groupProp.slice(5) : groupProp,
-            );
-
-      if (groupIdx !== -1) {
-        const groupMap = new Map<string, unknown[][]>();
-        for (const row of rows) {
-          const key = String(row[groupIdx] ?? "(empty)");
-          if (!groupMap.has(key)) groupMap.set(key, []);
-          groupMap.get(key)?.push(row);
-        }
-        groups = [...groupMap.entries()].map(([key, rows]) => ({ key, rows }));
-        if (view.groupBy.direction === "DESC") groups.reverse();
-      }
-    }
-
-    // Summaries
-    let summaries: Record<string, unknown> | undefined;
-    const viewSummaries = view?.summaries as Record<string, string> | undefined;
-    if (viewSummaries) {
-      summaries = {};
-      for (const [prop, fn] of Object.entries(viewSummaries)) {
-        const colIdx =
-          columns.indexOf(prop) !== -1
-            ? columns.indexOf(prop)
-            : columns.indexOf(prop.startsWith("note.") ? prop.slice(5) : prop);
-        if (colIdx === -1) continue;
-
-        const values = rows
-          .map((r: unknown[]) => r[colIdx])
-          .filter((v: unknown) => v !== null && v !== undefined);
-        summaries[prop] = computeSummary(fn, values, baseConfig);
-      }
-    }
-
-    return { columns, rows, groups, summaries, displayNames };
+    return {
+      columns,
+      rows,
+      groups: groupRows(view, columns, rows),
+      summaries: computeViewSummaries(view, columns, rows, baseConfig),
+      displayNames: buildDisplayNames(baseConfig),
+    };
   } catch (e) {
     throw new Error(`Base query failed: ${(e as Error).message}\nSQL: ${sql}`);
   }
@@ -734,59 +706,65 @@ function computeSummary(
   }
 
   const nums = values.map(Number).filter((n) => !Number.isNaN(n));
-  const dates = values
+  const numeric = NUMERIC_SUMMARIES[fn];
+  if (numeric) return numeric(nums);
+
+  const valueBased = VALUE_SUMMARIES[fn];
+  if (valueBased) return valueBased(values);
+
+  return null;
+}
+
+const median = (nums: number[]): number | null => {
+  if (nums.length === 0) return null;
+  const sorted = [...nums].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+};
+
+const stddev = (nums: number[]): number | null => {
+  if (nums.length === 0) return null;
+  const mean = nums.reduce((a, b) => a + b, 0) / nums.length;
+  const variance =
+    nums.reduce((sum, n) => sum + (n - mean) ** 2, 0) / nums.length;
+  return Math.sqrt(variance);
+};
+
+const NUMERIC_SUMMARIES: Record<string, (nums: number[]) => unknown> = {
+  Sum: (nums) => nums.reduce((a, b) => a + b, 0),
+  Average: (nums) =>
+    nums.length > 0 ? nums.reduce((a, b) => a + b, 0) / nums.length : 0,
+  Min: (nums) => (nums.length > 0 ? Math.min(...nums) : null),
+  Max: (nums) => (nums.length > 0 ? Math.max(...nums) : null),
+  Range: (nums) =>
+    nums.length > 0 ? Math.max(...nums) - Math.min(...nums) : null,
+  Median: median,
+  Stddev: stddev,
+};
+
+const asDates = (values: unknown[]): number[] =>
+  values
     .map((v) => new Date(v as string).getTime())
     .filter((n) => !Number.isNaN(n));
 
-  switch (fn) {
-    case "Sum":
-      return nums.reduce((a, b) => a + b, 0);
-    case "Average":
-      return nums.length > 0
-        ? nums.reduce((a, b) => a + b, 0) / nums.length
-        : 0;
-    case "Min":
-      return nums.length > 0 ? Math.min(...nums) : null;
-    case "Max":
-      return nums.length > 0 ? Math.max(...nums) : null;
-    case "Range":
-      return nums.length > 0 ? Math.max(...nums) - Math.min(...nums) : null;
-    case "Median": {
-      if (nums.length === 0) return null;
-      const sorted = [...nums].sort((a, b) => a - b);
-      const mid = Math.floor(sorted.length / 2);
-      return sorted.length % 2
-        ? sorted[mid]
-        : (sorted[mid - 1] + sorted[mid]) / 2;
-    }
-    case "Stddev": {
-      if (nums.length === 0) return null;
-      const mean = nums.reduce((a, b) => a + b, 0) / nums.length;
-      const variance =
-        nums.reduce((sum, n) => sum + (n - mean) ** 2, 0) / nums.length;
-      return Math.sqrt(variance);
-    }
-    case "Earliest":
-      return dates.length > 0 ? Math.min(...dates) : null;
-    case "Latest":
-      return dates.length > 0 ? Math.max(...dates) : null;
-    case "Checked":
-      return values.filter(
-        (v) => v === "true" || v === true || v === 1 || v === "1",
-      ).length;
-    case "Unchecked":
-      return values.filter(
-        (v) => v === "false" || v === false || v === 0 || v === "0",
-      ).length;
-    case "Empty":
-      return values.filter((v) => v === null || v === undefined || v === "")
-        .length;
-    case "Filled":
-      return values.filter((v) => v !== null && v !== undefined && v !== "")
-        .length;
-    case "Unique":
-      return new Set(values.map(String)).size;
-    default:
-      return null;
-  }
-}
+const VALUE_SUMMARIES: Record<string, (values: unknown[]) => unknown> = {
+  Earliest: (values) => {
+    const dates = asDates(values);
+    return dates.length > 0 ? Math.min(...dates) : null;
+  },
+  Latest: (values) => {
+    const dates = asDates(values);
+    return dates.length > 0 ? Math.max(...dates) : null;
+  },
+  Checked: (values) =>
+    values.filter((v) => v === "true" || v === true || v === 1 || v === "1")
+      .length,
+  Unchecked: (values) =>
+    values.filter((v) => v === "false" || v === false || v === 0 || v === "0")
+      .length,
+  Empty: (values) =>
+    values.filter((v) => v === null || v === undefined || v === "").length,
+  Filled: (values) =>
+    values.filter((v) => v !== null && v !== undefined && v !== "").length,
+  Unique: (values) => new Set(values.map(String)).size,
+};

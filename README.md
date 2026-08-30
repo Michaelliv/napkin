@@ -92,7 +92,7 @@ napkin is designed as a memory system for agents. Instead of dumping the full va
 | Level | Command | Tokens | What it does |
 |-------|---------|--------|-------------|
 | 0 | `NAPKIN.md` | ~200 | Project context note |
-| 1 | `napkin overview` | ~1-2k | L0 + vault map with TF-IDF keywords |
+| 1 | `napkin overview` | ~1-2k | L0 + vault map with search-validated keywords |
 | 2 | `napkin search <query>` | ~2-5k | Ranked results with snippets |
 | 3 | `napkin read <file>` | ~5-20k | Full file content |
 

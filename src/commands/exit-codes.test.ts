@@ -9,7 +9,7 @@ import { propertyRead, propertyRemove, propertySet } from "./properties.js";
 import { task } from "./tasks.js";
 import { wordcount } from "./wordcount.js";
 
-let v: { path: string; vaultPath: string; cleanup: () => void };
+let v: ReturnType<typeof createTempVault>;
 
 /**
  * Capture the exit code from a command that calls process.exit.
@@ -46,7 +46,7 @@ afterEach(() => {
 describe("file not found exits with EXIT_NOT_FOUND", () => {
   test("read", async () => {
     const code = await captureExit(() =>
-      read("nonexistent", { json: true, vault: v.path }),
+      read("nonexistent", { json: true, vault: v.projectPath }),
     );
     expect(code).toBe(EXIT_NOT_FOUND);
   });
@@ -55,7 +55,7 @@ describe("file not found exits with EXIT_NOT_FOUND", () => {
     const code = await captureExit(() =>
       append({
         json: true,
-        vault: v.path,
+        vault: v.projectPath,
         file: "nonexistent",
         content: "x",
       }),
@@ -67,7 +67,7 @@ describe("file not found exits with EXIT_NOT_FOUND", () => {
     const code = await captureExit(() =>
       prepend({
         json: true,
-        vault: v.path,
+        vault: v.projectPath,
         file: "nonexistent",
         content: "x",
       }),
@@ -77,7 +77,12 @@ describe("file not found exits with EXIT_NOT_FOUND", () => {
 
   test("move", async () => {
     const code = await captureExit(() =>
-      move({ json: true, vault: v.path, file: "nonexistent", to: "dest" }),
+      move({
+        json: true,
+        vault: v.projectPath,
+        file: "nonexistent",
+        to: "dest",
+      }),
     );
     expect(code).toBe(EXIT_NOT_FOUND);
   });
@@ -86,7 +91,7 @@ describe("file not found exits with EXIT_NOT_FOUND", () => {
     const code = await captureExit(() =>
       rename({
         json: true,
-        vault: v.path,
+        vault: v.projectPath,
         file: "nonexistent",
         name: "new",
       }),
@@ -96,49 +101,49 @@ describe("file not found exits with EXIT_NOT_FOUND", () => {
 
   test("delete", async () => {
     const code = await captureExit(() =>
-      del({ json: true, vault: v.path, file: "nonexistent" }),
+      del({ json: true, vault: v.projectPath, file: "nonexistent" }),
     );
     expect(code).toBe(EXIT_NOT_FOUND);
   });
 
   test("file info", async () => {
     const code = await captureExit(() =>
-      file("nonexistent", { json: true, vault: v.path }),
+      file("nonexistent", { json: true, vault: v.projectPath }),
     );
     expect(code).toBe(EXIT_NOT_FOUND);
   });
 
   test("folder info", async () => {
     const code = await captureExit(() =>
-      folder("nonexistent", { json: true, vault: v.path }),
+      folder("nonexistent", { json: true, vault: v.projectPath }),
     );
     expect(code).toBe(EXIT_NOT_FOUND);
   });
 
   test("outline", async () => {
     const code = await captureExit(() =>
-      outline({ json: true, vault: v.path, file: "nonexistent" }),
+      outline({ json: true, vault: v.projectPath, file: "nonexistent" }),
     );
     expect(code).toBe(EXIT_NOT_FOUND);
   });
 
   test("wordcount", async () => {
     const code = await captureExit(() =>
-      wordcount({ json: true, vault: v.path, file: "nonexistent" }),
+      wordcount({ json: true, vault: v.projectPath, file: "nonexistent" }),
     );
     expect(code).toBe(EXIT_NOT_FOUND);
   });
 
   test("backlinks", async () => {
     const code = await captureExit(() =>
-      backlinks({ json: true, vault: v.path, file: "nonexistent" }),
+      backlinks({ json: true, vault: v.projectPath, file: "nonexistent" }),
     );
     expect(code).toBe(EXIT_NOT_FOUND);
   });
 
   test("links out", async () => {
     const code = await captureExit(() =>
-      links({ json: true, vault: v.path, file: "nonexistent" }),
+      links({ json: true, vault: v.projectPath, file: "nonexistent" }),
     );
     expect(code).toBe(EXIT_NOT_FOUND);
   });
@@ -147,7 +152,7 @@ describe("file not found exits with EXIT_NOT_FOUND", () => {
     const code = await captureExit(() =>
       propertySet({
         json: true,
-        vault: v.path,
+        vault: v.projectPath,
         file: "nonexistent",
         name: "key",
         value: "val",
@@ -160,7 +165,7 @@ describe("file not found exits with EXIT_NOT_FOUND", () => {
     const code = await captureExit(() =>
       propertyRemove({
         json: true,
-        vault: v.path,
+        vault: v.projectPath,
         file: "nonexistent",
         name: "key",
       }),
@@ -172,7 +177,7 @@ describe("file not found exits with EXIT_NOT_FOUND", () => {
     const code = await captureExit(() =>
       propertyRead({
         json: true,
-        vault: v.path,
+        vault: v.projectPath,
         file: "nonexistent",
         name: "key",
       }),
@@ -186,21 +191,21 @@ describe("file not found exits with EXIT_NOT_FOUND", () => {
 describe("missing args exits with EXIT_USER_ERROR", () => {
   test("read without file", async () => {
     const code = await captureExit(() =>
-      read(undefined, { json: true, vault: v.path }),
+      read(undefined, { json: true, vault: v.projectPath }),
     );
     expect(code).toBe(EXIT_USER_ERROR);
   });
 
   test("append without file", async () => {
     const code = await captureExit(() =>
-      append({ json: true, vault: v.path, content: "x" }),
+      append({ json: true, vault: v.projectPath, content: "x" }),
     );
     expect(code).toBe(EXIT_USER_ERROR);
   });
 
   test("create existing file without overwrite", async () => {
     const code = await captureExit(() =>
-      create({ json: true, vault: v.path, name: "README" }),
+      create({ json: true, vault: v.projectPath, name: "README" }),
     );
     expect(code).toBe(EXIT_USER_ERROR);
   });
@@ -213,7 +218,7 @@ describe("task exit codes", () => {
     const code = await captureExit(() =>
       task({
         json: true,
-        vault: v.path,
+        vault: v.projectPath,
         file: "nonexistent",
         line: "1",
       }),
@@ -223,13 +228,15 @@ describe("task exit codes", () => {
 
   test("task on non-task line exits EXIT_USER_ERROR", async () => {
     const code = await captureExit(() =>
-      task({ json: true, vault: v.path, file: "README", line: "1" }),
+      task({ json: true, vault: v.projectPath, file: "README", line: "1" }),
     );
     expect(code).toBe(EXIT_USER_ERROR);
   });
 
   test("task without file or ref exits EXIT_USER_ERROR", async () => {
-    const code = await captureExit(() => task({ json: true, vault: v.path }));
+    const code = await captureExit(() =>
+      task({ json: true, vault: v.projectPath }),
+    );
     expect(code).toBe(EXIT_USER_ERROR);
   });
 });

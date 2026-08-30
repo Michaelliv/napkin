@@ -1,5 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { DEFAULT_CONFIG, SIBLING_VAULT_LAYOUT } from "./config.js";
+import { CONFIG_FILE } from "./vault-internals.js";
 
 export interface VaultInfo {
   /** Vault display name (derived from content root directory) */
@@ -55,17 +57,12 @@ function createBareVault(projectDir: string): VaultInfo {
   const napkinDir = path.join(projectDir, ".napkin");
   fs.mkdirSync(napkinDir, { recursive: true });
 
-  const configFile = path.join(napkinDir, "config.json");
+  const configFile = path.join(napkinDir, CONFIG_FILE);
   if (!fs.existsSync(configFile)) {
     fs.writeFileSync(
       configFile,
       JSON.stringify(
-        {
-          overview: { depth: 3, keywords: 8 },
-          search: { limit: 30, snippetLines: 0 },
-          daily: { folder: "daily", format: "YYYY-MM-DD" },
-          vault: { root: "..", obsidian: "../.obsidian" },
-        },
+        { ...DEFAULT_CONFIG, vault: SIBLING_VAULT_LAYOUT },
         null,
         2,
       ),
@@ -95,7 +92,7 @@ function createBareVault(projectDir: string): VaultInfo {
  * If no vault config exists, defaults to sibling layout (content in project dir).
  */
 function resolveVaultLayout(napkinDir: string, projectDir: string): VaultInfo {
-  const configPath = path.join(napkinDir, "config.json");
+  const configPath = path.join(napkinDir, CONFIG_FILE);
   let vaultConfig: { root?: string; obsidian?: string } | undefined;
 
   try {
@@ -125,21 +122,4 @@ function resolveVaultLayout(napkinDir: string, projectDir: string): VaultInfo {
     configPath: napkinDir,
     obsidianPath: path.join(napkinDir, ".obsidian"),
   };
-}
-
-/**
- * Read a JSON config file from .obsidian/ directory.
- * Returns parsed JSON or null if file doesn't exist.
- */
-export function getVaultConfig(
-  obsidianPath: string,
-  configFile: string,
-): Record<string, unknown> | null {
-  const configPath = path.join(obsidianPath, configFile);
-  try {
-    const content = fs.readFileSync(configPath, "utf-8");
-    return JSON.parse(content);
-  } catch {
-    return null;
-  }
 }

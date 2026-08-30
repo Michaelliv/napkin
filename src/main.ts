@@ -62,6 +62,7 @@ import {
 import { update } from "./commands/update.js";
 import { vault } from "./commands/vault.js";
 import { wordcount } from "./commands/wordcount.js";
+import { EXIT_ERROR, EXIT_SUCCESS } from "./utils/exit-codes.js";
 
 const { version } = packageJson;
 
@@ -81,7 +82,7 @@ program
   .helpCommand(false)
   .addHelpText("before", () => {
     showHelp();
-    process.exit(0);
+    process.exit(EXIT_SUCCESS);
   });
 
 function showHelp() {
@@ -100,7 +101,7 @@ Workflow: init → overview → search → read
 
 Getting started:
   init                 Initialize a new vault (--template, --list)
-  overview             Vault map with TF-IDF keywords per folder
+  overview             Vault map with search-validated keywords per folder
   vault                Show vault info (path, file count, size)
   config               Vault configuration (show, get, set)
   graph                Interactive vault graph visualization
@@ -164,7 +165,7 @@ program
   .command("overview")
   .description("Vault map with keywords (Level 1 progressive disclosure)")
   .option("--depth <n>", "Max folder depth")
-  .option("--keywords <n>", "Max keywords per folder")
+  .option("--keywords <n>", "Max keywords per folder (0 = quality-governed)")
   .option("--no-collapse", "Do not roll up homogeneous sibling folders")
   .action(async (opts, cmd) => {
     const root = { ...cmd.optsWithGlobals(), ...opts };
@@ -861,5 +862,5 @@ program
   })
   .catch((err) => {
     console.error("Fatal error:", err.message);
-    process.exit(1);
+    process.exit(EXIT_ERROR);
   });

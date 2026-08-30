@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { createTempVault } from "../utils/test-helpers.js";
 
-let v: { path: string; vaultPath: string; cleanup: () => void };
+let v: ReturnType<typeof createTempVault>;
 
 beforeEach(() => {
   v = createTempVault({
@@ -21,9 +21,16 @@ async function run(
   stdin?: string,
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   const proc = Bun.spawn(
-    ["bun", "run", path.resolve("src/main.ts"), "--vault", v.path, ...args],
+    [
+      "bun",
+      "run",
+      path.resolve("src/main.ts"),
+      "--vault",
+      v.projectPath,
+      ...args,
+    ],
     {
-      cwd: v.path,
+      cwd: v.projectPath,
       stdout: "pipe",
       stderr: "pipe",
       stdin: stdin ? "pipe" : undefined,
@@ -42,14 +49,14 @@ async function run(
 }
 
 function readFile(rel: string): string {
-  return fs.readFileSync(path.join(v.vaultPath, rel), "utf-8");
+  return fs.readFileSync(path.join(v.contentPath, rel), "utf-8");
 }
 
 describe("positional args", () => {
   test("create <name>", async () => {
     const { exitCode } = await run(["create", "Test Note", "--json"]);
     expect(exitCode).toBe(0);
-    expect(fs.existsSync(path.join(v.vaultPath, "Test Note.md"))).toBe(true);
+    expect(fs.existsSync(path.join(v.contentPath, "Test Note.md"))).toBe(true);
   });
 
   test("create <name> [content]", async () => {
@@ -112,8 +119,8 @@ describe("positional args", () => {
   test("move <file> <to>", async () => {
     const { exitCode } = await run(["move", "README", "Projects", "--json"]);
     expect(exitCode).toBe(0);
-    expect(fs.existsSync(path.join(v.vaultPath, "README.md"))).toBe(false);
-    expect(fs.existsSync(path.join(v.vaultPath, "Projects/README.md"))).toBe(
+    expect(fs.existsSync(path.join(v.contentPath, "README.md"))).toBe(false);
+    expect(fs.existsSync(path.join(v.contentPath, "Projects/README.md"))).toBe(
       true,
     );
   });
@@ -121,8 +128,8 @@ describe("positional args", () => {
   test("rename <file> <name>", async () => {
     const { exitCode } = await run(["rename", "README", "INDEX", "--json"]);
     expect(exitCode).toBe(0);
-    expect(fs.existsSync(path.join(v.vaultPath, "README.md"))).toBe(false);
-    expect(fs.existsSync(path.join(v.vaultPath, "INDEX.md"))).toBe(true);
+    expect(fs.existsSync(path.join(v.contentPath, "README.md"))).toBe(false);
+    expect(fs.existsSync(path.join(v.contentPath, "INDEX.md"))).toBe(true);
   });
 
   test("delete <file>", async () => {
@@ -133,7 +140,7 @@ describe("positional args", () => {
       "--json",
     ]);
     expect(exitCode).toBe(0);
-    expect(fs.existsSync(path.join(v.vaultPath, "README.md"))).toBe(false);
+    expect(fs.existsSync(path.join(v.contentPath, "README.md"))).toBe(false);
   });
 
   test("file outline <file>", async () => {

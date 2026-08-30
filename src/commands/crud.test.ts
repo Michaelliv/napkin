@@ -4,7 +4,7 @@ import * as path from "node:path";
 import { createTempVault } from "../utils/test-helpers.js";
 import { append, create, del, move, prepend, read, rename } from "./crud.js";
 
-let v: { path: string; vaultPath: string; cleanup: () => void };
+let v: ReturnType<typeof createTempVault>;
 
 async function captureJson(
   fn: () => Promise<void>,
@@ -32,7 +32,7 @@ afterEach(() => {
 describe("read", () => {
   test("reads file content", async () => {
     const data = await captureJson(() =>
-      read("README", { json: true, vault: v.path }),
+      read("README", { json: true, vault: v.projectPath }),
     );
     expect(data.content).toContain("Welcome");
   });
@@ -41,11 +41,16 @@ describe("read", () => {
 describe("create", () => {
   test("creates a new file", async () => {
     const data = await captureJson(() =>
-      create({ json: true, vault: v.path, name: "New Note", content: "Hello" }),
+      create({
+        json: true,
+        vault: v.projectPath,
+        name: "New Note",
+        content: "Hello",
+      }),
     );
     expect(data.created).toBe(true);
     const content = fs.readFileSync(
-      path.join(v.vaultPath, "New Note.md"),
+      path.join(v.contentPath, "New Note.md"),
       "utf-8",
     );
     expect(content).toBe("Hello");
@@ -55,14 +60,14 @@ describe("create", () => {
     const data = await captureJson(() =>
       create({
         json: true,
-        vault: v.path,
+        vault: v.projectPath,
         name: "Today",
         template: "Daily Note",
       }),
     );
     expect(data.created).toBe(true);
     const content = fs.readFileSync(
-      path.join(v.vaultPath, "Today.md"),
+      path.join(v.contentPath, "Today.md"),
       "utf-8",
     );
     expect(content).toContain("{{date}}");
@@ -72,13 +77,13 @@ describe("create", () => {
     await captureJson(() =>
       create({
         json: true,
-        vault: v.path,
+        vault: v.projectPath,
         path: "Archive/old-note",
         content: "archived",
       }),
     );
     const content = fs.readFileSync(
-      path.join(v.vaultPath, "Archive/old-note.md"),
+      path.join(v.contentPath, "Archive/old-note.md"),
       "utf-8",
     );
     expect(content).toBe("archived");
@@ -90,13 +95,13 @@ describe("append", () => {
     await captureJson(() =>
       append({
         json: true,
-        vault: v.path,
+        vault: v.projectPath,
         file: "README",
         content: "New line",
       }),
     );
     const content = fs.readFileSync(
-      path.join(v.vaultPath, "README.md"),
+      path.join(v.contentPath, "README.md"),
       "utf-8",
     );
     expect(content).toContain("Welcome\nNew line");
@@ -106,14 +111,14 @@ describe("append", () => {
     await captureJson(() =>
       append({
         json: true,
-        vault: v.path,
+        vault: v.projectPath,
         file: "README",
         content: " extra",
         inline: true,
       }),
     );
     const content = fs.readFileSync(
-      path.join(v.vaultPath, "README.md"),
+      path.join(v.contentPath, "README.md"),
       "utf-8",
     );
     expect(content).toContain("Welcome extra");
@@ -125,13 +130,13 @@ describe("prepend", () => {
     await captureJson(() =>
       prepend({
         json: true,
-        vault: v.path,
+        vault: v.projectPath,
         file: "Projects/note.md",
         content: "Prepended",
       }),
     );
     const content = fs.readFileSync(
-      path.join(v.vaultPath, "Projects/note.md"),
+      path.join(v.contentPath, "Projects/note.md"),
       "utf-8",
     );
     expect(content).toContain("title: Note");
@@ -145,10 +150,10 @@ describe("prepend", () => {
 describe("move", () => {
   test("moves file to new folder", async () => {
     await captureJson(() =>
-      move({ json: true, vault: v.path, file: "README", to: "Archive" }),
+      move({ json: true, vault: v.projectPath, file: "README", to: "Archive" }),
     );
-    expect(fs.existsSync(path.join(v.vaultPath, "README.md"))).toBe(false);
-    expect(fs.existsSync(path.join(v.vaultPath, "Archive/README.md"))).toBe(
+    expect(fs.existsSync(path.join(v.contentPath, "README.md"))).toBe(false);
+    expect(fs.existsSync(path.join(v.contentPath, "Archive/README.md"))).toBe(
       true,
     );
   });
@@ -157,28 +162,40 @@ describe("move", () => {
 describe("rename", () => {
   test("renames a file", async () => {
     await captureJson(() =>
-      rename({ json: true, vault: v.path, file: "README", name: "INDEX" }),
+      rename({
+        json: true,
+        vault: v.projectPath,
+        file: "README",
+        name: "INDEX",
+      }),
     );
-    expect(fs.existsSync(path.join(v.vaultPath, "README.md"))).toBe(false);
-    expect(fs.existsSync(path.join(v.vaultPath, "INDEX.md"))).toBe(true);
+    expect(fs.existsSync(path.join(v.contentPath, "README.md"))).toBe(false);
+    expect(fs.existsSync(path.join(v.contentPath, "INDEX.md"))).toBe(true);
   });
 });
 
 describe("delete", () => {
   test("moves file to .trash by default", async () => {
-    await captureJson(() => del({ json: true, vault: v.path, file: "README" }));
-    expect(fs.existsSync(path.join(v.vaultPath, "README.md"))).toBe(false);
-    expect(fs.existsSync(path.join(v.vaultPath, ".trash/README.md"))).toBe(
+    await captureJson(() =>
+      del({ json: true, vault: v.projectPath, file: "README" }),
+    );
+    expect(fs.existsSync(path.join(v.contentPath, "README.md"))).toBe(false);
+    expect(fs.existsSync(path.join(v.contentPath, ".trash/README.md"))).toBe(
       true,
     );
   });
 
   test("permanently deletes with --permanent", async () => {
     await captureJson(() =>
-      del({ json: true, vault: v.path, file: "README", permanent: true }),
+      del({
+        json: true,
+        vault: v.projectPath,
+        file: "README",
+        permanent: true,
+      }),
     );
-    expect(fs.existsSync(path.join(v.vaultPath, "README.md"))).toBe(false);
-    expect(fs.existsSync(path.join(v.vaultPath, ".trash/README.md"))).toBe(
+    expect(fs.existsSync(path.join(v.contentPath, "README.md"))).toBe(false);
+    expect(fs.existsSync(path.join(v.contentPath, ".trash/README.md"))).toBe(
       false,
     );
   });

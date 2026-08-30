@@ -9,7 +9,7 @@ import {
   propertySet,
 } from "./properties.js";
 
-let v: { path: string; vaultPath: string; cleanup: () => void };
+let v: ReturnType<typeof createTempVault>;
 
 async function captureJson(
   fn: () => Promise<void>,
@@ -37,7 +37,7 @@ afterEach(() => {
 describe("properties", () => {
   test("lists all properties", async () => {
     const data = await captureJson(() =>
-      properties({ json: true, vault: v.path }),
+      properties({ json: true, vault: v.projectPath }),
     );
     expect(data.properties).toContain("title");
     expect(data.properties).toContain("status");
@@ -45,7 +45,7 @@ describe("properties", () => {
 
   test("returns counts", async () => {
     const data = await captureJson(() =>
-      properties({ json: true, vault: v.path, counts: true }),
+      properties({ json: true, vault: v.projectPath, counts: true }),
     );
     const p = data.properties as Record<string, number>;
     expect(p.title).toBe(2);
@@ -54,7 +54,7 @@ describe("properties", () => {
 
   test("returns total", async () => {
     const data = await captureJson(() =>
-      properties({ json: true, vault: v.path, total: true }),
+      properties({ json: true, vault: v.projectPath, total: true }),
     );
     expect(data.total).toBe(2);
   });
@@ -63,7 +63,12 @@ describe("properties", () => {
 describe("propertyRead", () => {
   test("reads a property value", async () => {
     const data = await captureJson(() =>
-      propertyRead({ json: true, vault: v.path, file: "note1", name: "title" }),
+      propertyRead({
+        json: true,
+        vault: v.projectPath,
+        file: "note1",
+        name: "title",
+      }),
     );
     expect(data.value).toBe("Alpha");
   });
@@ -74,14 +79,14 @@ describe("propertySet", () => {
     await captureJson(() =>
       propertySet({
         json: true,
-        vault: v.path,
+        vault: v.projectPath,
         file: "note1",
         name: "priority",
         value: "high",
       }),
     );
     const content = fs.readFileSync(
-      path.join(v.vaultPath, "note1.md"),
+      path.join(v.contentPath, "note1.md"),
       "utf-8",
     );
     expect(content).toContain("priority: high");
@@ -93,13 +98,13 @@ describe("propertyRemove", () => {
     await captureJson(() =>
       propertyRemove({
         json: true,
-        vault: v.path,
+        vault: v.projectPath,
         file: "note1",
         name: "status",
       }),
     );
     const content = fs.readFileSync(
-      path.join(v.vaultPath, "note1.md"),
+      path.join(v.contentPath, "note1.md"),
       "utf-8",
     );
     expect(content).not.toContain("status");

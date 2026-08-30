@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { createTempVault } from "../utils/test-helpers.js";
 import { outline } from "./outline.js";
 
-let v: { path: string; vaultPath: string; cleanup: () => void };
+let v: ReturnType<typeof createTempVault>;
 
 async function captureJson(
   fn: () => Promise<void>,
@@ -29,7 +29,7 @@ afterEach(() => {
 describe("outline", () => {
   test("returns headings as json", async () => {
     const data = await captureJson(() =>
-      outline({ json: true, vault: v.path, file: "doc" }),
+      outline({ json: true, vault: v.projectPath, file: "doc" }),
     );
     const h = data.headings as { level: number; text: string }[];
     expect(h.length).toBe(4);
@@ -41,7 +41,7 @@ describe("outline", () => {
 
   test("returns total", async () => {
     const data = await captureJson(() =>
-      outline({ json: true, vault: v.path, file: "doc", total: true }),
+      outline({ json: true, vault: v.projectPath, file: "doc", total: true }),
     );
     expect(data.total).toBe(4);
   });

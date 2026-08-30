@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { listFiles, resolveFile } from "../utils/files.js";
+import { buildLinkResolver, listFiles, resolveFile } from "../utils/files.js";
 import { extractLinks } from "../utils/markdown.js";
 
 export interface VaultLinks {
@@ -9,8 +9,16 @@ export interface VaultLinks {
   unresolved: Map<string, string[]>;
 }
 
+function append(map: Map<string, string[]>, key: string, value: string): void {
+  if (!map.has(key)) map.set(key, []);
+  map.get(key)?.push(value);
+}
+
 export function buildLinkIndex(vaultPath: string): VaultLinks {
   const files = listFiles(vaultPath, { ext: "md" });
+  // Batch resolution with loose (shallowest-match) semantics: an ambiguous
+  // wikilink resolves like Obsidian instead of failing the whole index.
+  const resolve = buildLinkResolver(files);
   const outgoing = new Map<string, string[]>();
   const incoming = new Map<string, string[]>();
   const unresolved = new Map<string, string[]>();
@@ -23,14 +31,9 @@ export function buildLinkIndex(vaultPath: string): VaultLinks {
     outgoing.set(file, links.outgoing);
 
     for (const target of links.wikilinks) {
-      const resolved = resolveFile(vaultPath, target);
-      if (resolved) {
-        if (!incoming.has(resolved)) incoming.set(resolved, []);
-        incoming.get(resolved)?.push(file);
-      } else {
-        if (!unresolved.has(target)) unresolved.set(target, []);
-        unresolved.get(target)?.push(file);
-      }
+      const resolved = resolve(target);
+      if (resolved) append(incoming, resolved, file);
+      else append(unresolved, target, file);
     }
   }
 

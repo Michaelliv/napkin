@@ -74,6 +74,18 @@ export async function links(
   });
 }
 
+function printUnresolved(
+  entries: [string, string[]][],
+  opts: { counts?: boolean; verbose?: boolean },
+): void {
+  for (const [target, sources] of entries) {
+    console.log(opts.counts ? `${target}\t${sources.length}` : target);
+    if (opts.verbose) {
+      for (const s of sources) console.log(`  ${dim(s)}`);
+    }
+  }
+}
+
 export async function unresolvedLinks(
   opts: OutputOptions & {
     vault?: string;
@@ -97,16 +109,8 @@ export async function unresolvedLinks(
       return { unresolved: entries.map(([k]) => k) };
     },
     human: () => {
-      if (opts.total) {
-        console.log(entries.length);
-      } else {
-        for (const [target, sources] of entries) {
-          console.log(opts.counts ? `${target}\t${sources.length}` : target);
-          if (opts.verbose) {
-            for (const s of sources) console.log(`  ${dim(s)}`);
-          }
-        }
-      }
+      if (opts.total) console.log(entries.length);
+      else printUnresolved(entries, opts);
     },
   });
 }

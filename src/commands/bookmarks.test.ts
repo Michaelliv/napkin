@@ -4,7 +4,7 @@ import * as path from "node:path";
 import { createTempVault } from "../utils/test-helpers.js";
 import { bookmark, bookmarks } from "./bookmarks.js";
 
-let v: { path: string; vaultPath: string; cleanup: () => void };
+let v: ReturnType<typeof createTempVault>;
 
 async function captureJson(
   fn: () => Promise<void>,
@@ -21,7 +21,7 @@ beforeEach(() => {
   v = createTempVault({});
   // Write initial bookmarks
   fs.writeFileSync(
-    path.join(v.vaultPath, ".obsidian", "bookmarks.json"),
+    path.join(v.contentPath, ".obsidian", "bookmarks.json"),
     JSON.stringify([
       { type: "file", path: "note.md", title: "My Note" },
       { type: "search", query: "TODO" },
@@ -36,7 +36,7 @@ afterEach(() => {
 describe("bookmarks", () => {
   test("lists bookmarks", async () => {
     const data = await captureJson(() =>
-      bookmarks({ json: true, vault: v.path }),
+      bookmarks({ json: true, vault: v.projectPath }),
     );
     const b = data.bookmarks as { type: string }[];
     expect(b.length).toBe(2);
@@ -46,15 +46,15 @@ describe("bookmarks", () => {
 
   test("returns total", async () => {
     const data = await captureJson(() =>
-      bookmarks({ json: true, vault: v.path, total: true }),
+      bookmarks({ json: true, vault: v.projectPath, total: true }),
     );
     expect(data.total).toBe(2);
   });
 
   test("returns empty when no bookmarks file", async () => {
-    fs.unlinkSync(path.join(v.vaultPath, ".obsidian", "bookmarks.json"));
+    fs.unlinkSync(path.join(v.contentPath, ".obsidian", "bookmarks.json"));
     const data = await captureJson(() =>
-      bookmarks({ json: true, vault: v.path }),
+      bookmarks({ json: true, vault: v.projectPath }),
     );
     expect((data.bookmarks as unknown[]).length).toBe(0);
   });
@@ -63,10 +63,15 @@ describe("bookmarks", () => {
 describe("bookmark", () => {
   test("adds a file bookmark", async () => {
     await captureJson(() =>
-      bookmark({ json: true, vault: v.path, file: "new.md", title: "New" }),
+      bookmark({
+        json: true,
+        vault: v.projectPath,
+        file: "new.md",
+        title: "New",
+      }),
     );
     const raw = fs.readFileSync(
-      path.join(v.vaultPath, ".obsidian", "bookmarks.json"),
+      path.join(v.contentPath, ".obsidian", "bookmarks.json"),
       "utf-8",
     );
     const items = JSON.parse(raw);
@@ -77,10 +82,10 @@ describe("bookmark", () => {
 
   test("adds a search bookmark", async () => {
     await captureJson(() =>
-      bookmark({ json: true, vault: v.path, search: "FIXME" }),
+      bookmark({ json: true, vault: v.projectPath, search: "FIXME" }),
     );
     const raw = fs.readFileSync(
-      path.join(v.vaultPath, ".obsidian", "bookmarks.json"),
+      path.join(v.contentPath, ".obsidian", "bookmarks.json"),
       "utf-8",
     );
     const items = JSON.parse(raw);
@@ -90,10 +95,14 @@ describe("bookmark", () => {
 
   test("adds a URL bookmark", async () => {
     await captureJson(() =>
-      bookmark({ json: true, vault: v.path, url: "https://example.com" }),
+      bookmark({
+        json: true,
+        vault: v.projectPath,
+        url: "https://example.com",
+      }),
     );
     const raw = fs.readFileSync(
-      path.join(v.vaultPath, ".obsidian", "bookmarks.json"),
+      path.join(v.contentPath, ".obsidian", "bookmarks.json"),
       "utf-8",
     );
     const items = JSON.parse(raw);

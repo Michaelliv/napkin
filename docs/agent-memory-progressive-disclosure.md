@@ -4,7 +4,7 @@
 
 ## Core Idea
 
-Agents work best when information is revealed gradually rather than dumped all at once. Instead of vector search, we use a three-level disclosure model that respects context windows and gives agents control over how deep they go.
+Agents work best when information is revealed gradually rather than dumped all at once. Instead of vector search, we use a four-level disclosure model (Levels 0–3) that respects context windows and gives agents control over how deep they go.
 
 ## Levels of Disclosure
 
@@ -12,21 +12,18 @@ Agents work best when information is revealed gradually rather than dumped all a
 A small "always loaded" note the agent reads on every session. Like CLAUDE.md but for the knowledge base. Contains project goals, conventions, key decisions. Should fit in ~500 tokens.
 
 ### Level 1 — Overview Map
-A generated index of the entire vault. Directory tree with extracted keywords, tags, and key concepts per folder. Gives the agent orientation — a table of contents for the vault. Target: ~1-2K tokens max.
+A generated index of the entire vault. Directory tree with search-validated domain keywords per folder — the words an agent can actually search to land in that folder. Gives the agent orientation — a table of contents for the vault. Target: ~1-2K tokens max. Tags are available in `--json` but excluded from the primer: they cost tokens without carrying routing signal.
 
 Example output:
 ```
 projects/
   keywords: roadmap, Q2, launch, pricing
-  tags: #active, #planning
   notes: 4
 projects/napkin/
   keywords: CLI, obsidian, markdown, agent, memory
-  tags: #dev, #oss
   notes: 7
 people/
   keywords: hiring, team, 1on1
-  tags: #contact
   notes: 12
 ```
 

@@ -3,6 +3,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { addTemplate } from "../core/init.js";
+import { EXIT_ERROR } from "../utils/exit-codes.js";
 import { init } from "./init.js";
 
 let tmpDir: string;
@@ -220,7 +221,7 @@ describe("init command", () => {
       // expected
     }
     (process as any).exit = orig;
-    expect(exitCode).toBe(1);
+    expect(exitCode).toBe(EXIT_ERROR);
   });
 
   test("addTemplate on existing vault adds dirs and files", async () => {

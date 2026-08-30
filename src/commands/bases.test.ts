@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { createTempVault } from "../utils/test-helpers.js";
 import { baseQuery, bases, baseViews } from "./bases.js";
 
-let v: { path: string; vaultPath: string; cleanup: () => void };
+let v: ReturnType<typeof createTempVault>;
 
 async function captureJson(
   fn: () => Promise<void>,
@@ -31,7 +31,9 @@ afterEach(() => {
 
 describe("bases", () => {
   test("lists .base files", async () => {
-    const data = await captureJson(() => bases({ json: true, vault: v.path }));
+    const data = await captureJson(() =>
+      bases({ json: true, vault: v.projectPath }),
+    );
     const b = data.bases as string[];
     expect(b).toContain("projects.base");
   });
@@ -40,7 +42,7 @@ describe("bases", () => {
 describe("baseViews", () => {
   test("lists views in a base", async () => {
     const data = await captureJson(() =>
-      baseViews({ json: true, vault: v.path, file: "projects" }),
+      baseViews({ json: true, vault: v.projectPath, file: "projects" }),
     );
     const views = data.views as { name: string; type: string }[];
     expect(views.length).toBe(2);
@@ -52,7 +54,7 @@ describe("baseViews", () => {
 describe("baseQuery", () => {
   test("queries default view", async () => {
     const data = await captureJson(() =>
-      baseQuery({ json: true, vault: v.path, file: "projects" }),
+      baseQuery({ json: true, vault: v.projectPath, file: "projects" }),
     );
     const rows = data.rows as Record<string, unknown>[];
     expect(rows.length).toBe(2); // Alpha + Beta in Projects folder
@@ -62,7 +64,7 @@ describe("baseQuery", () => {
     const data = await captureJson(() =>
       baseQuery({
         json: true,
-        vault: v.path,
+        vault: v.projectPath,
         file: "projects",
         view: "Active",
       }),
@@ -76,7 +78,7 @@ describe("baseQuery", () => {
     const data = await captureJson(() =>
       baseQuery({
         json: true,
-        vault: v.path,
+        vault: v.projectPath,
         file: "projects",
         format: "paths",
       }),

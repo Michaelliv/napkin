@@ -2,13 +2,10 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { FerroSearch } from "@shift-labs/ferrosearch";
 import { loadConfig } from "../utils/config.js";
-import { listFiles, resolveFileLoose } from "../utils/files.js";
+import { buildLinkResolver, listFiles } from "../utils/files.js";
+import { computeFingerprint } from "../utils/fingerprint.js";
 import { extractLinks } from "../utils/markdown.js";
-import {
-  computeFingerprint,
-  loadSearchCache,
-  saveSearchCache,
-} from "../utils/search-cache.js";
+import { loadSearchCache, saveSearchCache } from "../utils/search-cache.js";
 
 export interface SearchResult {
   file: string;
@@ -69,13 +66,14 @@ function buildIndex(vaultPath: string, folder?: string) {
 
 function buildBacklinkCounts(vaultPath: string): Map<string, number> {
   const files = listFiles(vaultPath, { ext: "md" });
+  const resolve = buildLinkResolver(files);
   const counts = new Map<string, number>();
 
   for (const file of files) {
     const content = fs.readFileSync(path.join(vaultPath, file), "utf-8");
     const links = extractLinks(content);
     for (const target of links.wikilinks) {
-      const resolved = resolveFileLoose(vaultPath, target);
+      const resolved = resolve(target);
       if (resolved) {
         counts.set(resolved, (counts.get(resolved) || 0) + 1);
       }
@@ -139,15 +137,31 @@ function relativeTime(mtimeMs: number): string {
   return `${months}mo ago`;
 }
 
-export function searchVault(
+export interface RankedHit {
+  file: string;
+  /** Composite relevance: BM25 + log₂(1+backlinks) + recency, rounded to 0.1. */
+  score: number;
+  links: number;
+  mtime: number;
+  content: string;
+}
+
+export interface SearchCorpus {
+  rank(query: string): RankedHit[];
+}
+
+/**
+ * The vault's ranked search corpus — the index, documents, and backlink
+ * counts behind every relevance judgement, loaded from the search cache or
+ * built and saved. `searchVault` and the overview keyword probes share it so
+ * their notion of "what this query returns" can never disagree.
+ */
+export function loadSearchCorpus(
   contentPath: string,
   configPath: string,
-  query: string,
-  opts?: SearchOptions,
-): SearchResult[] {
-  const config = loadConfig(configPath);
-
-  const fingerprint = computeFingerprint(contentPath, opts?.path);
+  folder?: string,
+): SearchCorpus {
+  const fingerprint = computeFingerprint(contentPath, folder);
   const cached = loadSearchCache(configPath, fingerprint);
 
   let index: FerroSearch;
@@ -163,7 +177,7 @@ export function searchVault(
     });
     backlinkCounts = new Map(Object.entries(cached.backlinkCounts));
   } else {
-    const built = buildIndex(contentPath, opts?.path);
+    const built = buildIndex(contentPath, folder);
     index = built.index;
     docs = built.docs;
     backlinkCounts = buildBacklinkCounts(contentPath);
@@ -178,34 +192,58 @@ export function searchVault(
     });
   }
 
-  const results = index.search(query) as IndexHit[];
-  const contextLines = opts?.snippetLines ?? config.search.snippetLines;
-  const limit = opts?.limit ?? config.search.limit;
-
   const maxMtime = Math.max(...docs.map((d) => d.mtime));
   const minMtime = Math.min(...docs.map((d) => d.mtime));
   const mtimeRange = maxMtime - minMtime || 1;
 
-  const scored = results.map((r) => {
-    const doc = docs[r.id];
-    const bm25Score = r.score;
-    const links = backlinkCounts.get(doc.file) || 0;
-    const recency = (doc.mtime - minMtime) / mtimeRange;
+  return {
+    rank(query: string): RankedHit[] {
+      const results = index.search(query) as IndexHit[];
+      const scored = results.map((r) => {
+        const doc = docs[r.id];
+        const links = backlinkCounts.get(doc.file) || 0;
+        const recency = (doc.mtime - minMtime) / mtimeRange;
+        // Backlinks are log-damped: hub notes in link-dense vaults collect
+        // hundreds of inbound links, and a linear boost would swamp BM25
+        // relevance for every query (734 links × 0.5 = +367 vs BM25's ~5–30).
+        const composite = r.score + Math.log2(1 + links) + recency * 1.0;
+        return {
+          file: doc.file,
+          score: Math.round(composite * 10) / 10,
+          links,
+          mtime: doc.mtime,
+          content: doc.content,
+        };
+      });
+      scored.sort((a, b) => b.score - a.score);
+      return scored;
+    },
+  };
+}
 
-    const composite = bm25Score + links * 0.5 + recency * 1.0;
+export function searchVault(
+  contentPath: string,
+  configPath: string,
+  query: string,
+  opts?: SearchOptions,
+): SearchResult[] {
+  const config = loadConfig(configPath);
+  const corpus = loadSearchCorpus(contentPath, configPath, opts?.path);
 
-    return {
-      file: doc.file,
-      score: Math.round(composite * 10) / 10,
-      links,
-      modified: relativeTime(doc.mtime),
+  const contextLines = opts?.snippetLines ?? config.search.snippetLines;
+  const limit = opts?.limit ?? config.search.limit;
+
+  return corpus
+    .rank(query)
+    .slice(0, limit)
+    .map((hit) => ({
+      file: hit.file,
+      score: hit.score,
+      links: hit.links,
+      modified: relativeTime(hit.mtime),
       snippets:
         opts?.snippets === false
           ? []
-          : extractSnippets(doc.content, query, contextLines),
-    };
-  });
-
-  scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, limit);
+          : extractSnippets(hit.content, query, contextLines),
+    }));
 }

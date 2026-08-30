@@ -8,7 +8,7 @@ import {
 } from "./files.js";
 import { createTempVault } from "./test-helpers.js";
 
-let vault: { path: string; vaultPath: string; cleanup: () => void };
+let vault: { projectPath: string; contentPath: string; cleanup: () => void };
 
 beforeEach(() => {
   vault = createTempVault({
@@ -31,7 +31,7 @@ afterEach(() => {
 
 describe("listFiles", () => {
   test("lists all files", () => {
-    const files = listFiles(vault.vaultPath);
+    const files = listFiles(vault.contentPath);
     expect(files.length).toBe(8);
     // Should not include .obsidian files
     for (const f of files) {
@@ -40,7 +40,7 @@ describe("listFiles", () => {
   });
 
   test("filters by extension", () => {
-    const files = listFiles(vault.vaultPath, { ext: "md" });
+    const files = listFiles(vault.contentPath, { ext: "md" });
     expect(files.length).toBe(7);
     for (const f of files) {
       expect(f).toEndWith(".md");
@@ -48,7 +48,7 @@ describe("listFiles", () => {
   });
 
   test("filters by folder", () => {
-    const files = listFiles(vault.vaultPath, { folder: "Projects" });
+    const files = listFiles(vault.contentPath, { folder: "Projects" });
     expect(files.length).toBe(2);
     for (const f of files) {
       expect(f).toMatch(/^Projects\//);
@@ -56,64 +56,64 @@ describe("listFiles", () => {
   });
 
   test("returns empty for nonexistent folder", () => {
-    const files = listFiles(vault.vaultPath, { folder: "Nope" });
+    const files = listFiles(vault.contentPath, { folder: "Nope" });
     expect(files).toEqual([]);
   });
 });
 
 describe("listFolders", () => {
   test("lists folders", () => {
-    const folders = listFolders(vault.vaultPath);
+    const folders = listFolders(vault.contentPath);
     expect(folders).toContain("Projects");
     expect(folders).toContain("Resources");
     expect(folders).toContain("Templates");
   });
 
   test("filters by parent folder", () => {
-    const folders = listFolders(vault.vaultPath, "Resources");
+    const folders = listFolders(vault.contentPath, "Resources");
     expect(folders).toEqual(["Resources/Runbooks"]);
   });
 });
 
 describe("resolveFile", () => {
   test("resolves by exact path", () => {
-    const result = resolveFile(vault.vaultPath, "README.md");
+    const result = resolveFile(vault.contentPath, "README.md");
     expect(result).toBe("README.md");
   });
 
   test("resolves by wikilink name", () => {
-    const result = resolveFile(vault.vaultPath, "Active Projects");
+    const result = resolveFile(vault.contentPath, "Active Projects");
     expect(result).toBe("Projects/Active Projects.md");
   });
 
   test("resolves case-insensitively", () => {
-    const result = resolveFile(vault.vaultPath, "active projects");
+    const result = resolveFile(vault.contentPath, "active projects");
     expect(result).toBe("Projects/Active Projects.md");
   });
 
   test("returns null for missing file", () => {
-    const result = resolveFile(vault.vaultPath, "nonexistent-file");
+    const result = resolveFile(vault.contentPath, "nonexistent-file");
     expect(result).toBeNull();
   });
 });
 
 describe("readFile", () => {
   test("reads file by wikilink name", () => {
-    const { path, content } = readFile(vault.vaultPath, "README");
+    const { path, content } = readFile(vault.contentPath, "README");
     expect(path).toBe("README.md");
     expect(content).toContain("My Vault");
   });
 
   test("reads file by exact path", () => {
     const { content } = readFile(
-      vault.vaultPath,
+      vault.contentPath,
       "Projects/Active Projects.md",
     );
     expect(content).toContain("Project A");
   });
 
   test("throws for missing file", () => {
-    expect(() => readFile(vault.vaultPath, "nonexistent")).toThrow(
+    expect(() => readFile(vault.contentPath, "nonexistent")).toThrow(
       "File not found",
     );
   });
@@ -166,7 +166,7 @@ describe("sibling layout", () => {
 
 describe("getFileInfo", () => {
   test("returns file info", () => {
-    const info = getFileInfo(vault.vaultPath, "README.md");
+    const info = getFileInfo(vault.contentPath, "README.md");
     expect(info.name).toBe("README");
     expect(info.extension).toBe("md");
     expect(info.size).toBeGreaterThan(0);

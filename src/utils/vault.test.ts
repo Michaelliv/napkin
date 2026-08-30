@@ -3,9 +3,9 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { createTempVault } from "./test-helpers.js";
-import { findVault, getVaultConfig } from "./vault.js";
+import { findVault } from "./vault.js";
 
-let vault: { path: string; vaultPath: string; cleanup: () => void };
+let vault: { projectPath: string; contentPath: string; cleanup: () => void };
 
 beforeEach(() => {
   vault = createTempVault();
@@ -17,15 +17,15 @@ afterEach(() => {
 
 describe("findVault", () => {
   test("finds vault from project root", () => {
-    const result = findVault(vault.path);
-    expect(result.configPath).toBe(path.join(vault.path, ".napkin"));
+    const result = findVault(vault.projectPath);
+    expect(result.configPath).toBe(path.join(vault.projectPath, ".napkin"));
   });
 
   test("finds vault from subdirectory", () => {
-    const sub = path.join(vault.path, "some", "nested", "dir");
+    const sub = path.join(vault.projectPath, "some", "nested", "dir");
     fs.mkdirSync(sub, { recursive: true });
     const result = findVault(sub);
-    expect(result.configPath).toBe(path.join(vault.path, ".napkin"));
+    expect(result.configPath).toBe(path.join(vault.projectPath, ".napkin"));
   });
 
   test("auto-creates vault when none found", () => {
@@ -58,11 +58,11 @@ describe("findVault", () => {
 
   describe("layout: embedded (.napkin/.obsidian/)", () => {
     test("contentPath is .napkin/, obsidianPath is .napkin/.obsidian/", () => {
-      const result = findVault(vault.path);
-      expect(result.contentPath).toBe(path.join(vault.path, ".napkin"));
-      expect(result.configPath).toBe(path.join(vault.path, ".napkin"));
+      const result = findVault(vault.projectPath);
+      expect(result.contentPath).toBe(path.join(vault.projectPath, ".napkin"));
+      expect(result.configPath).toBe(path.join(vault.projectPath, ".napkin"));
       expect(result.obsidianPath).toBe(
-        path.join(vault.path, ".napkin", ".obsidian"),
+        path.join(vault.projectPath, ".napkin", ".obsidian"),
       );
     });
 
@@ -155,20 +155,5 @@ describe("findVault", () => {
       expect(result.configPath).toBe(path.join(tmpDir, ".obsidian", ".napkin"));
       expect(result.obsidianPath).toBe(path.join(tmpDir, ".obsidian"));
     });
-  });
-});
-
-describe("getVaultConfig", () => {
-  test("reads existing config file", () => {
-    const obsidianPath = path.join(vault.path, ".napkin", ".obsidian");
-    const config = getVaultConfig(obsidianPath, "app.json");
-    expect(config).not.toBeNull();
-    expect(config?.alwaysUpdateLinks).toBe(true);
-  });
-
-  test("returns null for missing config", () => {
-    const obsidianPath = path.join(vault.path, ".napkin", ".obsidian");
-    const config = getVaultConfig(obsidianPath, "nonexistent.json");
-    expect(config).toBeNull();
   });
 });

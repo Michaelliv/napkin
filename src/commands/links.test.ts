@@ -8,7 +8,7 @@ import {
   unresolvedLinks,
 } from "./links.js";
 
-let v: { path: string; vaultPath: string; cleanup: () => void };
+let v: ReturnType<typeof createTempVault>;
 
 async function captureJson(
   fn: () => Promise<void>,
@@ -38,7 +38,7 @@ afterEach(() => {
 describe("backlinks", () => {
   test("finds backlinks to a file", async () => {
     const data = await captureJson(() =>
-      backlinks({ json: true, vault: v.path, file: "Alpha" }),
+      backlinks({ json: true, vault: v.projectPath, file: "Alpha" }),
     );
     const bl = data.backlinks as string[];
     expect(bl).toContain("index.md");
@@ -47,7 +47,12 @@ describe("backlinks", () => {
 
   test("returns total", async () => {
     const data = await captureJson(() =>
-      backlinks({ json: true, vault: v.path, file: "Alpha", total: true }),
+      backlinks({
+        json: true,
+        vault: v.projectPath,
+        file: "Alpha",
+        total: true,
+      }),
     );
     expect(data.total).toBe(2);
   });
@@ -56,7 +61,7 @@ describe("backlinks", () => {
 describe("links", () => {
   test("lists outgoing links", async () => {
     const data = await captureJson(() =>
-      links({ json: true, vault: v.path, file: "index" }),
+      links({ json: true, vault: v.projectPath, file: "index" }),
     );
     const l = data.links as string[];
     expect(l).toContain("Alpha");
@@ -67,7 +72,7 @@ describe("links", () => {
 describe("unresolvedLinks", () => {
   test("finds unresolved links", async () => {
     const data = await captureJson(() =>
-      unresolvedLinks({ json: true, vault: v.path }),
+      unresolvedLinks({ json: true, vault: v.projectPath }),
     );
     const u = data.unresolved as string[];
     expect(u).toContain("Missing");
@@ -77,7 +82,7 @@ describe("unresolvedLinks", () => {
 describe("orphans", () => {
   test("finds files with no incoming links", async () => {
     const data = await captureJson(() =>
-      orphans({ json: true, vault: v.path }),
+      orphans({ json: true, vault: v.projectPath }),
     );
     const o = data.orphans as string[];
     expect(o).toContain("orphan.md");
@@ -89,7 +94,7 @@ describe("orphans", () => {
 describe("deadends", () => {
   test("finds files with no outgoing links", async () => {
     const data = await captureJson(() =>
-      deadends({ json: true, vault: v.path }),
+      deadends({ json: true, vault: v.projectPath }),
     );
     const d = data.deadends as string[];
     expect(d).toContain("orphan.md");

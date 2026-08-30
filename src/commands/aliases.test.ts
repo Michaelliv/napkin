@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { createTempVault } from "../utils/test-helpers.js";
 import { aliases } from "./aliases.js";
 
-let v: { path: string; vaultPath: string; cleanup: () => void };
+let v: ReturnType<typeof createTempVault>;
 
 async function captureJson(
   fn: () => Promise<void>,
@@ -30,7 +30,7 @@ afterEach(() => {
 describe("aliases", () => {
   test("lists all aliases", async () => {
     const data = await captureJson(() =>
-      aliases({ json: true, vault: v.path }),
+      aliases({ json: true, vault: v.projectPath }),
     );
     const a = data.aliases as string[];
     expect(a).toContain("Alpha");
@@ -41,14 +41,14 @@ describe("aliases", () => {
 
   test("returns total", async () => {
     const data = await captureJson(() =>
-      aliases({ json: true, vault: v.path, total: true }),
+      aliases({ json: true, vault: v.projectPath, total: true }),
     );
     expect(data.total).toBe(3);
   });
 
   test("filters by file", async () => {
     const data = await captureJson(() =>
-      aliases({ json: true, vault: v.path, file: "note1" }),
+      aliases({ json: true, vault: v.projectPath, file: "note1" }),
     );
     const a = data.aliases as string[];
     expect(a).toEqual(["Alpha", "A1"]);
@@ -56,7 +56,7 @@ describe("aliases", () => {
 
   test("verbose includes file paths", async () => {
     const data = await captureJson(() =>
-      aliases({ json: true, vault: v.path, verbose: true }),
+      aliases({ json: true, vault: v.projectPath, verbose: true }),
     );
     const a = data.aliases as { alias: string; file: string }[];
     expect(a[0].file).toBeTruthy();

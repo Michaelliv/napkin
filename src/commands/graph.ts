@@ -1,8 +1,10 @@
 import { exec } from "node:child_process";
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
-import { basename, extname, join, relative } from "node:path";
+import { basename, join } from "node:path";
 import { platform } from "node:process";
+import { EXIT_NO_VAULT } from "../utils/exit-codes.js";
+import { listFiles } from "../utils/files.js";
 import type { OutputOptions } from "../utils/output.js";
 import { error, info } from "../utils/output.js";
 
@@ -18,53 +20,33 @@ interface GraphLink {
   target: string;
 }
 
-function walkMd(dir: string, files: string[] = []): string[] {
-  for (const entry of readdirSync(dir)) {
-    if (entry.startsWith(".")) continue;
-    const full = join(dir, entry);
-    if (statSync(full).isDirectory()) {
-      walkMd(full, files);
-    } else if (extname(full) === ".md") {
-      files.push(full);
-    }
-  }
-  return files;
-}
-
-function buildGraphData(vaultPath: string): {
-  nodes: GraphNode[];
-  links: GraphLink[];
-} {
-  const mdFiles = walkMd(vaultPath).filter((f) => {
-    const rel = relative(vaultPath, f);
-    return !rel.startsWith("Templates/") && basename(f) !== "index.md";
-  });
-
+function collectGraphNodes(vaultPath: string, mdFiles: string[]): GraphNode[] {
   const nodes: GraphNode[] = [];
-  const links: GraphLink[] = [];
-  const nodeSet = new Set<string>();
-
-  // Build nodes
-  for (const file of mdFiles) {
-    const rel = relative(vaultPath, file);
+  for (const rel of mdFiles) {
     const slug = rel.replace(/\.md$/, "");
-    const content = readFileSync(file, "utf-8");
+    const content = readFileSync(join(vaultPath, rel), "utf-8");
     const titleMatch = content.match(/^#\s+(.+)$/m);
-    const title = titleMatch ? titleMatch[1] : basename(file, ".md");
-
-    nodeSet.add(slug);
+    const title = titleMatch ? titleMatch[1] : basename(rel, ".md");
     nodes.push({ id: slug, text: title, content, filePath: rel });
   }
+  return nodes;
+}
 
-  // Build name -> [slugs] for disambiguation
+function indexSlugsByBasename(nodes: GraphNode[]): Map<string, string[]> {
   const nameToSlugs = new Map<string, string[]>();
   for (const node of nodes) {
     const name = basename(node.filePath, ".md");
     if (!nameToSlugs.has(name)) nameToSlugs.set(name, []);
     nameToSlugs.get(name)?.push(node.id);
   }
+  return nameToSlugs;
+}
 
-  // Extract wikilinks and build edges
+/** Wikilink edges between nodes; same-folder match preferred, deduplicated. */
+function buildGraphLinks(nodes: GraphNode[]): GraphLink[] {
+  const nameToSlugs = indexSlugsByBasename(nodes);
+  const links: GraphLink[] = [];
+  const seen = new Set<string>();
   for (const node of nodes) {
     const wikilinks = [
       ...node.content.matchAll(/\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g),
@@ -73,19 +55,29 @@ function buildGraphData(vaultPath: string): {
     for (const link of wikilinks) {
       const candidates = nameToSlugs.get(link);
       if (!candidates) continue;
-      // Prefer same-folder match, otherwise first
       const target =
         candidates.find((s) => s.startsWith(`${nodeFolder}/`)) || candidates[0];
-      if (target && target !== node.id) {
-        // Avoid duplicate edges
-        if (!links.some((l) => l.source === node.id && l.target === target)) {
-          links.push({ source: node.id, target: target });
-        }
-      }
+      if (target === node.id || seen.has(`${node.id}\u0000${target}`)) continue;
+      seen.add(`${node.id}\u0000${target}`);
+      links.push({ source: node.id, target: target });
     }
   }
+  return links;
+}
 
-  return { nodes, links };
+function buildGraphData(
+  vaultPath: string,
+  templatesFolder: string,
+): {
+  nodes: GraphNode[];
+  links: GraphLink[];
+} {
+  const mdFiles = listFiles(vaultPath, { ext: "md" }).filter(
+    (rel) =>
+      !rel.startsWith(`${templatesFolder}/`) && basename(rel) !== "index.md",
+  );
+  const nodes = collectGraphNodes(vaultPath, mdFiles);
+  return { nodes, links: buildGraphLinks(nodes) };
 }
 
 function buildHTML(graphDataB64: string): string {
@@ -466,14 +458,14 @@ export async function graph(
 
   if (!vault) {
     error("No vault found. Run napkin init or use --vault <path>");
-    process.exit(1);
+    process.exit(EXIT_NO_VAULT);
   }
 
   const { loadConfig } = await import("../utils/config.js");
   const config = loadConfig(vaultInfo.configPath);
   const renderer = config.graph?.renderer ?? "auto";
 
-  const { nodes, links } = buildGraphData(vault);
+  const { nodes, links } = buildGraphData(vault, config.templates.folder);
   const graphDataB64 = Buffer.from(JSON.stringify({ nodes, links })).toString(
     "base64",
   );

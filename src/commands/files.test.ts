@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { createTempVault } from "../utils/test-helpers.js";
 import { file, files, folders } from "./files.js";
 
-let v: { path: string; vaultPath: string; cleanup: () => void };
+let v: ReturnType<typeof createTempVault>;
 
 async function captureJson(
   fn: () => Promise<void>,
@@ -31,7 +31,7 @@ afterEach(() => {
 describe("file command", () => {
   test("shows file info as json", async () => {
     const data = await captureJson(() =>
-      file("README", { json: true, vault: v.path }),
+      file("README", { json: true, vault: v.projectPath }),
     );
     expect(data.name).toBe("README");
     expect(data.extension).toBe("md");
@@ -41,20 +41,22 @@ describe("file command", () => {
 
 describe("files command", () => {
   test("lists all files", async () => {
-    const data = await captureJson(() => files({ json: true, vault: v.path }));
+    const data = await captureJson(() =>
+      files({ json: true, vault: v.projectPath }),
+    );
     expect((data.files as string[]).length).toBe(4);
   });
 
   test("filters by extension", async () => {
     const data = await captureJson(() =>
-      files({ json: true, vault: v.path, ext: "md" }),
+      files({ json: true, vault: v.projectPath, ext: "md" }),
     );
     expect((data.files as string[]).length).toBe(3);
   });
 
   test("returns total", async () => {
     const data = await captureJson(() =>
-      files({ json: true, vault: v.path, total: true }),
+      files({ json: true, vault: v.projectPath, total: true }),
     );
     expect(data.total).toBe(4);
   });
@@ -63,7 +65,7 @@ describe("files command", () => {
 describe("folders command", () => {
   test("lists folders", async () => {
     const data = await captureJson(() =>
-      folders({ json: true, vault: v.path }),
+      folders({ json: true, vault: v.projectPath }),
     );
     expect(data.folders).toContain("Projects");
     expect(data.folders).toContain("Resources");
@@ -71,7 +73,7 @@ describe("folders command", () => {
 
   test("returns total", async () => {
     const data = await captureJson(() =>
-      folders({ json: true, vault: v.path, total: true }),
+      folders({ json: true, vault: v.projectPath, total: true }),
     );
     expect(data.total).toBe(2);
   });

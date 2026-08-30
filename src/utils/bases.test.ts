@@ -12,7 +12,7 @@ import {
 } from "./formula.js";
 import { createTempVault } from "./test-helpers.js";
 
-let v: { path: string; vaultPath: string; cleanup: () => void };
+let v: ReturnType<typeof createTempVault>;
 
 beforeEach(() => {
   v = createTempVault({
@@ -33,14 +33,14 @@ afterEach(() => {
 
 describe("buildDatabase", () => {
   test("creates database with all files", async () => {
-    const db = await buildDatabase(v.vaultPath);
+    const db = await buildDatabase(v.contentPath);
     const result = db.exec("SELECT COUNT(*) FROM files");
     expect(result[0].values[0][0]).toBe(5);
     db.close();
   });
 
   test("indexes frontmatter properties as columns", async () => {
-    const db = await buildDatabase(v.vaultPath);
+    const db = await buildDatabase(v.contentPath);
     const result = db.exec(
       "SELECT prop_title, prop_status FROM files WHERE prop_title = 'Alpha'",
     );
@@ -50,7 +50,7 @@ describe("buildDatabase", () => {
   });
 
   test("stores tags as JSON array", async () => {
-    const db = await buildDatabase(v.vaultPath);
+    const db = await buildDatabase(v.contentPath);
     const result = db.exec("SELECT tags FROM files WHERE prop_title = 'Alpha'");
     const tags = JSON.parse(result[0].values[0][0] as string);
     expect(tags).toContain("project");
@@ -58,7 +58,7 @@ describe("buildDatabase", () => {
   });
 
   test("stores file metadata", async () => {
-    const db = await buildDatabase(v.vaultPath);
+    const db = await buildDatabase(v.contentPath);
     const result = db.exec(
       "SELECT name, folder, ext FROM files WHERE prop_title = 'Alpha'",
     );
@@ -109,7 +109,7 @@ describe("filterToSQL", () => {
 
 describe("file.backlinks, file.embeds, file.properties", () => {
   test("backlinks are computed", async () => {
-    const db = await buildDatabase(v.vaultPath);
+    const db = await buildDatabase(v.contentPath);
     // gamma.md has [[Alpha]] link, so alpha should have a backlink from gamma
     const result = db.exec(
       "SELECT backlinks FROM files WHERE basename = 'alpha'",
@@ -120,14 +120,14 @@ describe("file.backlinks, file.embeds, file.properties", () => {
   });
 
   test("embeds column exists", async () => {
-    const db = await buildDatabase(v.vaultPath);
+    const db = await buildDatabase(v.contentPath);
     const result = db.exec("SELECT embeds FROM files LIMIT 1");
     expect(result[0].columns).toContain("embeds");
     db.close();
   });
 
   test("file_properties column stores frontmatter", async () => {
-    const db = await buildDatabase(v.vaultPath);
+    const db = await buildDatabase(v.contentPath);
     const result = db.exec(
       "SELECT file_properties FROM files WHERE basename = 'alpha'",
     );
@@ -146,7 +146,7 @@ describe("regex filters", () => {
   });
 
   test("regex filter works in query", async () => {
-    const db = await buildDatabase(v.vaultPath);
+    const db = await buildDatabase(v.contentPath);
     // Match files with lowercase alpha-only basenames
     const config = parseBaseFile(
       "filters:\n  '/^[a-z]+$/.matches(file.basename)'\nviews:\n  - type: table",
@@ -160,7 +160,7 @@ describe("regex filters", () => {
 
 describe("list method filters", () => {
   test("list property contains works via JSON LIKE", async () => {
-    const db = await buildDatabase(v.vaultPath);
+    const db = await buildDatabase(v.contentPath);
     // tags are stored as JSON, contains works on the JSON string
     const config = parseBaseFile(
       'filters:\n  file.hasTag("project")\nviews:\n  - type: table',
@@ -194,7 +194,7 @@ describe("string method filters", () => {
   });
 
   test("contains works in query", async () => {
-    const db = await buildDatabase(v.vaultPath);
+    const db = await buildDatabase(v.contentPath);
     const config = parseBaseFile(
       "filters:\n  'title.contains(\"lph\")'\nviews:\n  - type: table",
     );
@@ -224,7 +224,7 @@ describe("inline boolean operators", () => {
   });
 
   test("&& works in actual query", async () => {
-    const db = await buildDatabase(v.vaultPath);
+    const db = await buildDatabase(v.contentPath);
     const config = parseBaseFile(
       "filters:\n  'status == \"active\" && priority >= 2'\nviews:\n  - type: table",
     );
@@ -255,7 +255,7 @@ describe("date functions in filters", () => {
   });
 
   test("date arithmetic works in queries", async () => {
-    const db = await buildDatabase(v.vaultPath);
+    const db = await buildDatabase(v.contentPath);
     // All files were just created, so mtime > now() - "1d" should match all
     const config = parseBaseFile(
       "filters:\n  'file.mtime > now() - \"365d\"'\nviews:\n  - type: table",
@@ -360,7 +360,7 @@ describe("formula engine", () => {
 
 describe("formulas in queryBase", () => {
   test("computes formula columns", async () => {
-    const db = await buildDatabase(v.vaultPath);
+    const db = await buildDatabase(v.contentPath);
     const yaml = `
 formulas:
   doubled: "priority * 2"
@@ -386,7 +386,7 @@ views:
 
 describe("summaries", () => {
   test("computes Sum summary", async () => {
-    const db = await buildDatabase(v.vaultPath);
+    const db = await buildDatabase(v.contentPath);
     const yaml = `
 filters:
   file.hasProperty("priority")
@@ -403,7 +403,7 @@ views:
   });
 
   test("computes Average summary", async () => {
-    const db = await buildDatabase(v.vaultPath);
+    const db = await buildDatabase(v.contentPath);
     const yaml = `
 filters:
   file.hasProperty("priority")
@@ -419,7 +419,7 @@ views:
   });
 
   test("computes Unique summary", async () => {
-    const db = await buildDatabase(v.vaultPath);
+    const db = await buildDatabase(v.contentPath);
     const yaml = `
 filters:
   file.hasProperty("status")
@@ -437,7 +437,7 @@ views:
 
 describe("groupBy", () => {
   test("groups by property", async () => {
-    const db = await buildDatabase(v.vaultPath);
+    const db = await buildDatabase(v.contentPath);
     const yaml = `
 filters:
   file.hasProperty("status")
@@ -460,7 +460,7 @@ views:
 
 describe("displayNames", () => {
   test("maps display names", async () => {
-    const db = await buildDatabase(v.vaultPath);
+    const db = await buildDatabase(v.contentPath);
     const yaml = `
 properties:
   status:
@@ -481,7 +481,7 @@ views:
 
 describe("this keyword", () => {
   test("this.file.folder resolves in filter", async () => {
-    const db = await buildDatabase(v.vaultPath);
+    const db = await buildDatabase(v.contentPath);
     const config = parseBaseFile(
       "filters:\n  'file.inFolder(this.file.folder)'\nviews:\n  - type: table",
     );
@@ -518,7 +518,7 @@ describe("comprehensive integration", () => {
         "---\ntitle: Meeting Notes\nstatus: active\ntags:\n  - meeting\n---\n# Meeting\nDiscussed [[Web App]] and [[API Design]]",
     });
 
-    const db = await buildDatabase(rich.vaultPath);
+    const db = await buildDatabase(rich.contentPath);
     const yaml = `
 filters:
   and:
@@ -586,7 +586,7 @@ views:
 
 describe("queryBase", () => {
   test("queries with file.inFolder filter", async () => {
-    const db = await buildDatabase(v.vaultPath);
+    const db = await buildDatabase(v.contentPath);
     const config = parseBaseFile(
       'filters:\n  file.inFolder("Projects")\nviews:\n  - type: table\n    name: Projects',
     );
@@ -596,7 +596,7 @@ describe("queryBase", () => {
   });
 
   test("queries with property filter", async () => {
-    const db = await buildDatabase(v.vaultPath);
+    const db = await buildDatabase(v.contentPath);
     const config = parseBaseFile(
       'filters:\n  and:\n    - \'status == "active"\'\n    - file.inFolder("Projects")\nviews:\n  - type: table',
     );
@@ -606,7 +606,7 @@ describe("queryBase", () => {
   });
 
   test("queries with hasTag filter", async () => {
-    const db = await buildDatabase(v.vaultPath);
+    const db = await buildDatabase(v.contentPath);
     const config = parseBaseFile(
       'filters:\n  file.hasTag("project")\nviews:\n  - type: table',
     );
@@ -616,7 +616,7 @@ describe("queryBase", () => {
   });
 
   test("respects view limit", async () => {
-    const db = await buildDatabase(v.vaultPath);
+    const db = await buildDatabase(v.contentPath);
     const config = parseBaseFile("views:\n  - type: table\n    limit: 2");
     const result = await queryBase(db, config);
     expect(result.rows.length).toBe(2);
@@ -624,7 +624,7 @@ describe("queryBase", () => {
   });
 
   test("selects view by name", async () => {
-    const db = await buildDatabase(v.vaultPath);
+    const db = await buildDatabase(v.contentPath);
     const yaml = `
 views:
   - type: table

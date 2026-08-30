@@ -48,6 +48,87 @@ export async function baseViews(
   });
 }
 
+/** Zip one row into a column-keyed object. */
+function rowToObject(
+  columns: string[],
+  row: unknown[],
+  skipNulls = false,
+): Record<string, unknown> {
+  const obj: Record<string, unknown> = {};
+  for (let i = 0; i < columns.length; i++) {
+    if (skipNulls && row[i] === null) continue;
+    obj[columns[i]] = row[i];
+  }
+  return obj;
+}
+
+function baseQueryJson(
+  result: BaseQueryResult,
+  fmt: string,
+): Record<string, unknown> {
+  if (fmt === "paths") {
+    const pathIdx = result.columns.indexOf("path");
+    return { paths: result.rows.map((r) => r[pathIdx]) };
+  }
+  const out: Record<string, unknown> = {
+    columns: result.columns,
+    rows: result.rows.map((row) => rowToObject(result.columns, row)),
+  };
+  if (result.displayNames && Object.keys(result.displayNames).length > 0) {
+    out.displayNames = result.displayNames;
+  }
+  if (result.groups) {
+    out.groups = result.groups.map((g) => ({
+      key: g.key,
+      rows: g.rows.map((row) => rowToObject(result.columns, row)),
+    }));
+  }
+  if (result.summaries) out.summaries = result.summaries;
+  return out;
+}
+
+function printBaseQuery(
+  result: BaseQueryResult,
+  fmt: string,
+  displayCols: string[],
+): void {
+  if (result.rows.length === 0) {
+    console.log("No results");
+    return;
+  }
+
+  if (fmt === "paths") {
+    const pathIdx = result.columns.indexOf("path");
+    for (const row of result.rows) console.log(row[pathIdx]);
+    return;
+  }
+
+  if (fmt === "csv" || fmt === "tsv") {
+    const sep = fmt === "csv" ? "," : "\t";
+    console.log(displayCols.join(sep));
+    for (const row of result.rows) {
+      console.log(row.map((v) => (v === null ? "" : String(v))).join(sep));
+    }
+    return;
+  }
+
+  if (fmt === "md") {
+    console.log(`| ${displayCols.join(" | ")} |`);
+    console.log(`| ${displayCols.map(() => "---").join(" | ")} |`);
+    for (const row of result.rows) {
+      console.log(
+        `| ${row.map((v) => (v === null ? "" : String(v))).join(" | ")} |`,
+      );
+    }
+    return;
+  }
+
+  // Default: one JSON object per row, nulls omitted
+  for (const row of result.rows) {
+    console.log(JSON.stringify(rowToObject(result.columns, row, true)));
+  }
+}
+
 export async function baseQuery(
   opts: OutputOptions & {
     vault?: string;
@@ -70,79 +151,8 @@ export async function baseQuery(
   const displayCols = result.columns.map((c) => result.displayNames?.[c] || c);
 
   output(opts, {
-    json: () => {
-      if (fmt === "paths") {
-        const pathIdx = result.columns.indexOf("path");
-        return { paths: result.rows.map((r) => r[pathIdx]) };
-      }
-      // Convert to array of objects
-      const rows = result.rows.map((row) => {
-        const obj: Record<string, unknown> = {};
-        for (let i = 0; i < result.columns.length; i++) {
-          obj[result.columns[i]] = row[i];
-        }
-        return obj;
-      });
-      const out: Record<string, unknown> = { columns: result.columns, rows };
-      if (result.displayNames && Object.keys(result.displayNames).length > 0) {
-        out.displayNames = result.displayNames;
-      }
-      if (result.groups) {
-        out.groups = result.groups.map((g) => ({
-          key: g.key,
-          rows: g.rows.map((row) => {
-            const obj: Record<string, unknown> = {};
-            for (let i = 0; i < result.columns.length; i++) {
-              obj[result.columns[i]] = row[i];
-            }
-            return obj;
-          }),
-        }));
-      }
-      if (result.summaries) out.summaries = result.summaries;
-      return out;
-    },
-    human: () => {
-      if (result.rows.length === 0) {
-        console.log("No results");
-        return;
-      }
-
-      if (fmt === "paths") {
-        const pathIdx = result.columns.indexOf("path");
-        for (const row of result.rows) console.log(row[pathIdx]);
-        return;
-      }
-
-      if (fmt === "csv" || fmt === "tsv") {
-        const sep = fmt === "csv" ? "," : "\t";
-        console.log(displayCols.join(sep));
-        for (const row of result.rows) {
-          console.log(row.map((v) => (v === null ? "" : String(v))).join(sep));
-        }
-        return;
-      }
-
-      if (fmt === "md") {
-        console.log(`| ${displayCols.join(" | ")} |`);
-        console.log(`| ${displayCols.map(() => "---").join(" | ")} |`);
-        for (const row of result.rows) {
-          console.log(
-            `| ${row.map((v) => (v === null ? "" : String(v))).join(" | ")} |`,
-          );
-        }
-        return;
-      }
-
-      // Default: table-like
-      for (const row of result.rows) {
-        const obj: Record<string, unknown> = {};
-        for (let i = 0; i < result.columns.length; i++) {
-          if (row[i] !== null) obj[result.columns[i]] = row[i];
-        }
-        console.log(JSON.stringify(obj));
-      }
-    },
+    json: () => baseQueryJson(result, fmt),
+    human: () => printBaseQuery(result, fmt, displayCols),
   });
 }
 

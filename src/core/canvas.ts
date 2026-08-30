@@ -127,29 +127,49 @@ export function addCanvasNode(
 
   const { canvas, filePath } = resolveCanvas(vaultPath, fileRef);
 
-  const maxX = canvas.nodes.reduce((max, n) => Math.max(max, n.x + n.width), 0);
-
   const node: CanvasNode = {
     id: genId(),
     type: nodeType,
-    x: opts.x
-      ? Number.parseInt(opts.x, 10)
-      : canvas.nodes.length > 0
-        ? maxX + 50
-        : 0,
-    y: opts.y ? Number.parseInt(opts.y, 10) : 0,
-    width: opts.width
-      ? Number.parseInt(opts.width, 10)
-      : nodeType === "group"
-        ? 600
-        : 300,
-    height: opts.height
-      ? Number.parseInt(opts.height, 10)
-      : nodeType === "group"
-        ? 400
-        : 150,
+    ...nodeGeometry(canvas, nodeType, opts),
   };
+  applyNodeContent(node, nodeType, opts);
+  if (opts.color) node.color = opts.color;
 
+  canvas.nodes.push(node);
+  writeCanvas(vaultPath, filePath, canvas);
+
+  return { id: node.id, type: node.type, added: true };
+}
+
+const intOr = (v: string | undefined, fallback: number): number =>
+  v ? Number.parseInt(v, 10) : fallback;
+
+/** Position and size: right of the last node, group nodes larger. */
+function nodeGeometry(
+  canvas: Canvas,
+  nodeType: CanvasNode["type"],
+  opts: { x?: string; y?: string; width?: string; height?: string },
+): { x: number; y: number; width: number; height: number } {
+  const maxX = canvas.nodes.reduce((max, n) => Math.max(max, n.x + n.width), 0);
+  return {
+    x: intOr(opts.x, canvas.nodes.length > 0 ? maxX + 50 : 0),
+    y: intOr(opts.y, 0),
+    width: intOr(opts.width, nodeType === "group" ? 600 : 300),
+    height: intOr(opts.height, nodeType === "group" ? 400 : 150),
+  };
+}
+
+function applyNodeContent(
+  node: CanvasNode,
+  nodeType: CanvasNode["type"],
+  opts: {
+    text?: string;
+    noteFile?: string;
+    subpath?: string;
+    url?: string;
+    label?: string;
+  },
+): void {
   if (nodeType === "text") node.text = opts.text || "";
   if (nodeType === "file") {
     node.file = opts.noteFile || "";
@@ -157,12 +177,6 @@ export function addCanvasNode(
   }
   if (nodeType === "link") node.url = opts.url || "";
   if (nodeType === "group") node.label = opts.label || "";
-  if (opts.color) node.color = opts.color;
-
-  canvas.nodes.push(node);
-  writeCanvas(vaultPath, filePath, canvas);
-
-  return { id: node.id, type: node.type, added: true };
 }
 
 export function addCanvasEdge(

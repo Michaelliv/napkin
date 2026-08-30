@@ -4,8 +4,10 @@ import { TEMPLATES, type VaultTemplate } from "../templates/index.js";
 import {
   DEFAULT_CONFIG,
   type NapkinConfig,
+  SIBLING_VAULT_LAYOUT,
   saveConfig,
 } from "../utils/config.js";
+import { CONFIG_FILE } from "../utils/vault-internals.js";
 
 export interface InitResult {
   status: string;
@@ -69,7 +71,7 @@ export function initVault(opts: {
     fs.existsSync(obsidianDir) && fs.statSync(obsidianDir).isDirectory();
 
   const napkinExists = fs.existsSync(napkinDir);
-  const configExists = fs.existsSync(path.join(napkinDir, "config.json"));
+  const configExists = fs.existsSync(path.join(napkinDir, CONFIG_FILE));
 
   if (napkinExists && configExists && !opts.template) {
     return { status: "exists", path: napkinDir };
@@ -85,10 +87,10 @@ export function initVault(opts: {
     fs.mkdirSync(napkinDir, { recursive: true });
   }
 
-  if (!fs.existsSync(path.join(napkinDir, "config.json"))) {
+  if (!fs.existsSync(path.join(napkinDir, CONFIG_FILE))) {
     const config: NapkinConfig = {
       ...DEFAULT_CONFIG,
-      vault: { root: "..", obsidian: "../.obsidian" },
+      vault: SIBLING_VAULT_LAYOUT,
     };
     saveConfig(
       napkinDir,
@@ -138,10 +140,10 @@ export function scaffoldVault(
     fs.mkdirSync(napkinDir, { recursive: true });
   }
 
-  if (!fs.existsSync(path.join(napkinDir, "config.json"))) {
+  if (!fs.existsSync(path.join(napkinDir, CONFIG_FILE))) {
     const config: NapkinConfig = {
       ...DEFAULT_CONFIG,
-      vault: { root: "..", obsidian: "../.obsidian" },
+      vault: SIBLING_VAULT_LAYOUT,
     };
     saveConfig(
       napkinDir,
@@ -182,7 +184,7 @@ export function addTemplate(
   const resolved = path.resolve(targetPath);
   const napkinDir = path.join(resolved, ".napkin");
 
-  if (!fs.existsSync(path.join(napkinDir, "config.json"))) {
+  if (!fs.existsSync(path.join(napkinDir, CONFIG_FILE))) {
     throw new Error("Vault not initialized. Run scaffold first.");
   }
 

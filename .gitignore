@@ -22,6 +22,9 @@ bun.lock
 bench/data/
 bench/results/
 
+# Local KB corpora for overview-quality evals (private)
+data-kbs/
+
 # dotenv
 .env
 .env.local

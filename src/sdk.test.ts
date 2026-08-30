@@ -4,7 +4,7 @@ import * as path from "node:path";
 import { Napkin } from "./sdk.js";
 import { createTempVault } from "./utils/test-helpers.js";
 
-let v: { path: string; vaultPath: string; cleanup: () => void };
+let v: ReturnType<typeof createTempVault>;
 let n: Napkin;
 
 beforeEach(() => {
@@ -15,7 +15,7 @@ beforeEach(() => {
       "---\ntitle: Note\ntags:\n  - project\naliases:\n  - my-note\n---\n# Project Note\n\nBody content\n\n[[README]]",
     "Templates/Daily Note.md": "# {{date}}\n\n## Tasks\n",
   });
-  n = new Napkin(v.path);
+  n = new Napkin(v.projectPath);
 });
 
 afterEach(() => {

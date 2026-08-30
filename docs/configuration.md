@@ -17,7 +17,7 @@ napkin config set --key search.limit --value 50
 | Key | Default | Description |
 |-----|---------|-------------|
 | `overview.depth` | `3` | Max folder depth in vault map |
-| `overview.keywords` | `8` | Max TF-IDF keywords per folder |
+| `overview.keywords` | `0` | Max keywords per folder (`0` = quality-governed, no cap) |
 | `overview.collapse` | `true` | Roll up numerous, lexically similar sibling folders into one row |
 
 ### search

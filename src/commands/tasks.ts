@@ -11,6 +11,20 @@ import {
   output,
 } from "../utils/output.js";
 
+function printTasksByFile(result: TaskWithFile[]): void {
+  const byFile = new Map<string, TaskWithFile[]>();
+  for (const t of result) {
+    if (!byFile.has(t.file)) byFile.set(t.file, []);
+    byFile.get(t.file)?.push(t);
+  }
+  for (const [file, tasks] of byFile) {
+    console.log(bold(file));
+    for (const t of tasks) {
+      console.log(`  ${dim(`${t.line}:`)} [${t.status}] ${t.text}`);
+    }
+  }
+}
+
 export async function tasks(
   opts: OutputOptions & {
     vault?: string;
@@ -38,17 +52,7 @@ export async function tasks(
       if (opts.total) {
         console.log(result.length);
       } else if (opts.verbose) {
-        const byFile = new Map<string, TaskWithFile[]>();
-        for (const t of result) {
-          if (!byFile.has(t.file)) byFile.set(t.file, []);
-          byFile.get(t.file)?.push(t);
-        }
-        for (const [file, tasks] of byFile) {
-          console.log(bold(file));
-          for (const t of tasks) {
-            console.log(`  ${dim(`${t.line}:`)} [${t.status}] ${t.text}`);
-          }
-        }
+        printTasksByFile(result);
       } else {
         for (const t of result) {
           console.log(`[${t.status}] ${t.text}`);
@@ -56,6 +60,18 @@ export async function tasks(
       }
     },
   });
+}
+
+/** The status a mutation flag requests, or the current one unchanged. */
+function requestedStatus(
+  opts: { toggle?: boolean; done?: boolean; todo?: boolean; status?: string },
+  currentStatus: string,
+): string {
+  if (opts.status) return opts.status;
+  if (opts.done) return "x";
+  if (opts.todo) return " ";
+  if (opts.toggle) return currentStatus === " " ? "x" : " ";
+  return currentStatus;
 }
 
 export async function task(
@@ -103,14 +119,11 @@ export async function task(
   const isMutating = opts.toggle || opts.done || opts.todo || opts.status;
 
   if (isMutating) {
-    let newStatus: string;
-    if (opts.status) newStatus = opts.status;
-    else if (opts.done) newStatus = "x";
-    else if (opts.todo) newStatus = " ";
-    else if (opts.toggle) newStatus = currentStatus === " " ? "x" : " ";
-    else newStatus = currentStatus;
-
-    const result = n.taskUpdate(filePath, lineNum, newStatus);
+    const result = n.taskUpdate(
+      filePath,
+      lineNum,
+      requestedStatus(opts, currentStatus),
+    );
 
     output(opts, {
       json: () => result,

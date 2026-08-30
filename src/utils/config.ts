@@ -1,5 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { CONFIG_FILE } from "./vault-internals.js";
 
 export interface VaultLayout {
   /** Content root relative to .napkin/ dir (e.g. ".." for sibling layout) */
@@ -12,6 +13,7 @@ export interface NapkinConfig {
   vault?: VaultLayout;
   overview: {
     depth: number;
+    /** Max keywords per folder row; 0 = quality-governed, no cap. */
     keywords: number;
     /** Roll up numerous, lexically homogeneous sibling folders into one row. */
     collapse: boolean;
@@ -32,10 +34,16 @@ export interface NapkinConfig {
   };
 }
 
+/** The sibling layout: content in the project dir, .napkin/ beside it. */
+export const SIBLING_VAULT_LAYOUT: VaultLayout = {
+  root: "..",
+  obsidian: "../.obsidian",
+};
+
 export const DEFAULT_CONFIG: NapkinConfig = {
   overview: {
     depth: 3,
-    keywords: 8,
+    keywords: 0,
     collapse: true,
   },
   search: {
@@ -59,7 +67,7 @@ export const DEFAULT_CONFIG: NapkinConfig = {
  * Missing fields fall back to defaults.
  */
 export function loadConfig(napkinDir: string): NapkinConfig {
-  const configPath = path.join(napkinDir, "config.json");
+  const configPath = path.join(napkinDir, CONFIG_FILE);
   if (!fs.existsSync(configPath)) return { ...DEFAULT_CONFIG };
   try {
     const raw = JSON.parse(fs.readFileSync(configPath, "utf-8"));
@@ -78,7 +86,7 @@ export function saveConfig(
   config: NapkinConfig,
   obsidianDir?: string,
 ): void {
-  const configPath = path.join(napkinDir, "config.json");
+  const configPath = path.join(napkinDir, CONFIG_FILE);
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
   const resolvedObsidian =
     obsidianDir ||

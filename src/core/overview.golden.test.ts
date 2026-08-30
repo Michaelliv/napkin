@@ -6,13 +6,14 @@ import { getOverview } from "./overview.js";
  * Characterization (golden) test for getOverview.
  *
  * The fixture vault deterministically exercises every code path in
- * overview.ts: weighted TF sources (filename x2, title x2, frontmatter x2,
- * body x1, headings x3), heading dedup across files, heading corroboration
- * filtering, bigram extraction + unigram suppression, folder-token exclusion
- * (singular/plural), noise stripping (code, URLs, emails, HTML, GUIDs, digit
- * blobs, hex runs), scaffold skipping (Templates/, NAPKIN.md, _about.md),
- * depth limiting, malformed-frontmatter warnings, homogeneous-sibling
- * collapse, and heterogeneous siblings kept separate.
+ * overview.ts: weighted term sources (filename x2, frontmatter x2, body x1,
+ * corroborated headings x2), heading corroboration filtering, phrase
+ * preference, folder-token exclusion (singular/plural), junk gates (ID
+ * slugs, vowelless blobs), noise stripping (code, URLs, emails, HTML,
+ * GUIDs, digit blobs, hex runs), scaffold skipping (Templates/, NAPKIN.md,
+ * _about.md), depth limiting, malformed-frontmatter warnings,
+ * homogeneous-sibling collapse, heterogeneous siblings kept separate, and
+ * search-probe routability over the shared search corpus.
  *
  * Any behavior change in the overview pipeline must show up as a snapshot
  * diff. Performance refactors must keep this snapshot byte-identical.
@@ -138,12 +139,12 @@ afterAll(() => vault.cleanup());
 
 describe("getOverview golden", () => {
   test("default options", () => {
-    const result = getOverview(vault.vaultPath, vault.vaultPath);
+    const result = getOverview(vault.contentPath, vault.contentPath);
     expect(result).toMatchSnapshot();
   });
 
   test("depth 3, keywords 8", () => {
-    const result = getOverview(vault.vaultPath, vault.vaultPath, {
+    const result = getOverview(vault.contentPath, vault.contentPath, {
       depth: 3,
       keywords: 8,
     });
@@ -151,7 +152,7 @@ describe("getOverview golden", () => {
   });
 
   test("collapse disabled", () => {
-    const result = getOverview(vault.vaultPath, vault.vaultPath, {
+    const result = getOverview(vault.contentPath, vault.contentPath, {
       collapse: false,
       depth: 3,
     });

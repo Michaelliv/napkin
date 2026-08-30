@@ -7,13 +7,14 @@ import { DEFAULT_CONFIG, saveConfig } from "./config.js";
  * Create a temporary vault for testing.
  * .napkin/ is the vault root — all content lives inside it.
  * Returns:
- *   - path: parent dir (pass to --vault for commands, findVault walks up from here)
- *   - vaultPath: the .napkin/ dir (pass directly to utility functions like listFiles)
+ *   - projectPath: parent dir (pass to --vault for commands; findVault walks up from here)
+ *   - contentPath: the vault content root (pass directly to utilities like listFiles),
+ *     named after VaultInfo.contentPath
  *   - cleanup: removes everything
  */
 export function createTempVault(files?: Record<string, string>): {
-  path: string;
-  vaultPath: string;
+  projectPath: string;
+  contentPath: string;
   cleanup: () => void;
 } {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "napkin-test-"));
@@ -42,8 +43,8 @@ export function createTempVault(files?: Record<string, string>): {
   }
 
   return {
-    path: tmpDir,
-    vaultPath: napkinDir,
+    projectPath: tmpDir,
+    contentPath: napkinDir,
     cleanup: () => fs.rmSync(tmpDir, { recursive: true, force: true }),
   };
 }

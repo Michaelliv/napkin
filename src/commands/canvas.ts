@@ -1,4 +1,4 @@
-import type { Canvas } from "../core/canvas.js";
+import type { Canvas, CanvasNode } from "../core/canvas.js";
 import { Napkin } from "../sdk.js";
 import { EXIT_NOT_FOUND, EXIT_USER_ERROR } from "../utils/exit-codes.js";
 import {
@@ -9,6 +9,20 @@ import {
   output,
   success,
 } from "../utils/output.js";
+
+/** One-line description of a node for listings. */
+function nodeSummary(node: CanvasNode, groupFallback = ""): string {
+  switch (node.type) {
+    case "text":
+      return (node.text?.split("\n")[0] || "").slice(0, 60);
+    case "file":
+      return node.file ?? "";
+    case "link":
+      return node.url ?? "";
+    case "group":
+      return node.label || groupFallback;
+  }
+}
 
 export async function canvases(
   opts: OutputOptions & { vault?: string; total?: boolean },
@@ -55,16 +69,7 @@ export async function canvasRead(
       console.log(`${canvas.nodes.length} nodes, ${canvas.edges.length} edges`);
       console.log();
       for (const node of canvas.nodes) {
-        const desc =
-          node.type === "text"
-            ? (node.text?.split("\n")[0] || "").slice(0, 60)
-            : node.type === "file"
-              ? node.file
-              : node.type === "link"
-                ? node.url
-                : node.type === "group"
-                  ? node.label || "(unnamed group)"
-                  : "";
+        const desc = nodeSummary(node, "(unnamed group)");
         console.log(
           `  ${dim(node.id.slice(0, 8))}  ${node.type.padEnd(6)} ${desc}`,
         );
@@ -107,15 +112,7 @@ export async function canvasNodes(
     json: () => ({ nodes }),
     human: () => {
       for (const node of nodes) {
-        const desc =
-          node.type === "text"
-            ? (node.text?.split("\n")[0] || "").slice(0, 60)
-            : node.type === "file"
-              ? node.file
-              : node.type === "link"
-                ? node.url
-                : node.label || "";
-        console.log(`${node.id}  ${node.type.padEnd(6)} ${desc}`);
+        console.log(`${node.id}  ${node.type.padEnd(6)} ${nodeSummary(node)}`);
       }
     },
   });

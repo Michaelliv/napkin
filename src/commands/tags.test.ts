@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { createTempVault } from "../utils/test-helpers.js";
 import { tag, tags } from "./tags.js";
 
-let v: { path: string; vaultPath: string; cleanup: () => void };
+let v: ReturnType<typeof createTempVault>;
 
 async function captureJson(
   fn: () => Promise<void>,
@@ -29,14 +29,16 @@ afterEach(() => {
 
 describe("tags", () => {
   test("lists all tags", async () => {
-    const data = await captureJson(() => tags({ json: true, vault: v.path }));
+    const data = await captureJson(() =>
+      tags({ json: true, vault: v.projectPath }),
+    );
     expect(data.tags).toContain("project");
     expect(data.tags).toContain("urgent");
   });
 
   test("returns counts", async () => {
     const data = await captureJson(() =>
-      tags({ json: true, vault: v.path, counts: true }),
+      tags({ json: true, vault: v.projectPath, counts: true }),
     );
     const t = data.tags as Record<string, number>;
     expect(t.project).toBe(2);
@@ -45,14 +47,14 @@ describe("tags", () => {
 
   test("returns total", async () => {
     const data = await captureJson(() =>
-      tags({ json: true, vault: v.path, total: true }),
+      tags({ json: true, vault: v.projectPath, total: true }),
     );
     expect(data.total).toBe(2);
   });
 
   test("filters by file", async () => {
     const data = await captureJson(() =>
-      tags({ json: true, vault: v.path, file: "note3" }),
+      tags({ json: true, vault: v.projectPath, file: "note3" }),
     );
     expect((data.tags as string[]).length).toBe(0);
   });
@@ -61,14 +63,14 @@ describe("tags", () => {
 describe("tag", () => {
   test("shows tag info", async () => {
     const data = await captureJson(() =>
-      tag({ json: true, vault: v.path, name: "project" }),
+      tag({ json: true, vault: v.projectPath, name: "project" }),
     );
     expect(data.count).toBe(2);
   });
 
   test("shows verbose with files", async () => {
     const data = await captureJson(() =>
-      tag({ json: true, vault: v.path, name: "urgent", verbose: true }),
+      tag({ json: true, vault: v.projectPath, name: "urgent", verbose: true }),
     );
     expect(data.count).toBe(2);
     expect((data.files as string[]).length).toBe(2);

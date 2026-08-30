@@ -12,20 +12,15 @@ import {
   readFile,
   renameFile,
 } from "./crud.js";
-import { ensureDaily, getDailyPath, readDaily } from "./daily.js";
+import { ensureDaily, readDaily } from "./daily.js";
 import { getFileInfoResolved, getFolderInfo } from "./files.js";
 import { initVault } from "./init.js";
 import { getOutline } from "./outline.js";
-import {
-  collectProperties,
-  readProperty,
-  removeProperty,
-  setProperty,
-} from "./properties.js";
+import { readProperty, removeProperty, setProperty } from "./properties.js";
 import { showTask, updateTask } from "./tasks.js";
 import { getWordCount } from "./wordcount.js";
 
-let v: { path: string; vaultPath: string; cleanup: () => void };
+let v: ReturnType<typeof createTempVault>;
 
 beforeEach(() => {
   v = createTempVault({
@@ -44,79 +39,79 @@ afterEach(() => {
 
 describe("core throws on file not found", () => {
   test("readFile throws with prefix", () => {
-    expect(() => readFile(v.vaultPath, "nonexistent")).toThrow(
+    expect(() => readFile(v.contentPath, "nonexistent")).toThrow(
       "File not found: nonexistent",
     );
   });
 
   test("appendFile throws with prefix", () => {
-    expect(() => appendFile(v.vaultPath, "nonexistent", "text")).toThrow(
+    expect(() => appendFile(v.contentPath, "nonexistent", "text")).toThrow(
       "File not found: nonexistent",
     );
   });
 
   test("prependFile throws with prefix", () => {
-    expect(() => prependFile(v.vaultPath, "nonexistent", "text")).toThrow(
+    expect(() => prependFile(v.contentPath, "nonexistent", "text")).toThrow(
       "File not found: nonexistent",
     );
   });
 
   test("moveFile throws with prefix", () => {
-    expect(() => moveFile(v.vaultPath, "nonexistent", "dest")).toThrow(
+    expect(() => moveFile(v.contentPath, "nonexistent", "dest")).toThrow(
       "File not found: nonexistent",
     );
   });
 
   test("renameFile throws with prefix", () => {
-    expect(() => renameFile(v.vaultPath, "nonexistent", "new")).toThrow(
+    expect(() => renameFile(v.contentPath, "nonexistent", "new")).toThrow(
       "File not found: nonexistent",
     );
   });
 
   test("deleteFile throws with prefix", () => {
-    expect(() => deleteFile(v.vaultPath, "nonexistent")).toThrow(
+    expect(() => deleteFile(v.contentPath, "nonexistent")).toThrow(
       "File not found: nonexistent",
     );
   });
 
   test("getFileInfoResolved throws with prefix", () => {
-    expect(() => getFileInfoResolved(v.vaultPath, "nonexistent")).toThrow(
+    expect(() => getFileInfoResolved(v.contentPath, "nonexistent")).toThrow(
       "File not found: nonexistent",
     );
   });
 
   test("getFolderInfo throws with prefix", () => {
-    expect(() => getFolderInfo(v.vaultPath, "nonexistent")).toThrow(
+    expect(() => getFolderInfo(v.contentPath, "nonexistent")).toThrow(
       "Folder not found: nonexistent",
     );
   });
 
   test("getOutline throws with prefix", () => {
-    expect(() => getOutline(v.vaultPath, "nonexistent")).toThrow(
+    expect(() => getOutline(v.contentPath, "nonexistent")).toThrow(
       "File not found: nonexistent",
     );
   });
 
   test("getWordCount throws with prefix", () => {
-    expect(() => getWordCount(v.vaultPath, "nonexistent")).toThrow(
+    expect(() => getWordCount(v.contentPath, "nonexistent")).toThrow(
       "File not found: nonexistent",
     );
   });
 
   test("setProperty throws with prefix", () => {
-    expect(() => setProperty(v.vaultPath, "nonexistent", "key", "val")).toThrow(
-      "File not found: nonexistent",
-    );
+    expect(() =>
+      setProperty(v.contentPath, "nonexistent", "key", "val"),
+    ).toThrow("File not found: nonexistent");
   });
 
   test("removeProperty throws with prefix", () => {
-    expect(() => removeProperty(v.vaultPath, "nonexistent", "key")).toThrow(
+    expect(() => removeProperty(v.contentPath, "nonexistent", "key")).toThrow(
       "File not found: nonexistent",
     );
   });
 
   test("readProperty throws with prefix", () => {
-    expect(() => readProperty(v.vaultPath, "nonexistent", "key")).toThrow(
+    expect(() => readProperty(v.contentPath, "nonexistent", "key")).toThrow(
       "File not found: nonexistent",
     );
   });
@@ -154,14 +149,14 @@ describe("core module purity", () => {
 
 describe("createFile", () => {
   test("throws on existing file without overwrite", () => {
-    const vault = findVault(v.path);
+    const vault = findVault(v.projectPath);
     expect(() => createFile(vault, { name: "README" })).toThrow(
       "File already exists",
     );
   });
 
   test("throws on invalid template", () => {
-    const vault = findVault(v.path);
+    const vault = findVault(v.projectPath);
     expect(() =>
       createFile(vault, { name: "Test", template: "nonexistent" }),
     ).toThrow("Template not found: nonexistent");
@@ -172,14 +167,14 @@ describe("createFile", () => {
 
 describe("ensureDaily", () => {
   test("returns created: true when daily note does not exist", () => {
-    const vault = findVault(v.path);
+    const vault = findVault(v.projectPath);
     const result = ensureDaily(vault);
     expect(result.created).toBe(true);
     expect(result.path).toBeTruthy();
   });
 
   test("returns created: false when daily note already exists", () => {
-    const vault = findVault(v.path);
+    const vault = findVault(v.projectPath);
     ensureDaily(vault); // create it
     const result = ensureDaily(vault); // call again
     expect(result.created).toBe(false);
@@ -190,12 +185,12 @@ describe("ensureDaily", () => {
 
 describe("readDaily", () => {
   test("throws when daily note does not exist", () => {
-    const vault = findVault(v.path);
+    const vault = findVault(v.projectPath);
     expect(() => readDaily(vault)).toThrow("Daily note not found");
   });
 
   test("returns content after ensureDaily", () => {
-    const vault = findVault(v.path);
+    const vault = findVault(v.projectPath);
     ensureDaily(vault);
     const result = readDaily(vault);
     expect(result.path).toBeTruthy();
@@ -257,36 +252,38 @@ describe("initVault", () => {
 
 describe("showTask", () => {
   test("returns current status and text", () => {
-    const result = showTask(v.vaultPath, "README.md", 4);
+    const result = showTask(v.contentPath, "README.md", 4);
     expect(result.currentStatus).toBe(" ");
     expect(result.text).toBe("task one");
   });
 
   test("throws on non-task line", () => {
-    expect(() => showTask(v.vaultPath, "README.md", 1)).toThrow(
+    expect(() => showTask(v.contentPath, "README.md", 1)).toThrow(
       "is not a task",
     );
   });
 
   test("throws on missing line", () => {
-    expect(() => showTask(v.vaultPath, "README.md", 999)).toThrow(
+    expect(() => showTask(v.contentPath, "README.md", 999)).toThrow(
       "not found in",
     );
   });
 
   test("throws on missing file", () => {
-    expect(() => showTask(v.vaultPath, "nope.md", 1)).toThrow("File not found");
+    expect(() => showTask(v.contentPath, "nope.md", 1)).toThrow(
+      "File not found",
+    );
   });
 });
 
 describe("updateTask", () => {
   test("writes new status to file", () => {
-    const result = updateTask(v.vaultPath, "README.md", 4, "x");
+    const result = updateTask(v.contentPath, "README.md", 4, "x");
     expect(result.status).toBe("x");
     expect(result.text).toBe("task one");
 
     const content = fs.readFileSync(
-      path.join(v.vaultPath, "README.md"),
+      path.join(v.contentPath, "README.md"),
       "utf-8",
     );
     expect(content).toContain("- [x] task one");
@@ -298,7 +295,7 @@ describe("updateTask", () => {
 describe("property operations", () => {
   test("setProperty parses boolean values", () => {
     const result = setProperty(
-      v.vaultPath,
+      v.contentPath,
       "Projects/note.md",
       "draft",
       "true",
@@ -308,7 +305,7 @@ describe("property operations", () => {
 
   test("setProperty parses number values", () => {
     const result = setProperty(
-      v.vaultPath,
+      v.contentPath,
       "Projects/note.md",
       "priority",
       "42",
@@ -317,15 +314,19 @@ describe("property operations", () => {
   });
 
   test("readProperty returns null for missing property", () => {
-    const result = readProperty(v.vaultPath, "Projects/note.md", "nonexistent");
+    const result = readProperty(
+      v.contentPath,
+      "Projects/note.md",
+      "nonexistent",
+    );
     expect(result.value).toBeNull();
   });
 
   test("removeProperty returns removed key", () => {
-    const result = removeProperty(v.vaultPath, "Projects/note.md", "title");
+    const result = removeProperty(v.contentPath, "Projects/note.md", "title");
     expect(result.removed).toBe("title");
 
-    const check = readProperty(v.vaultPath, "Projects/note.md", "title");
+    const check = readProperty(v.contentPath, "Projects/note.md", "title");
     expect(check.value).toBeNull();
   });
 });
