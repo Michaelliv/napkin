@@ -1,0 +1,29 @@
+{
+  "name": "napkin-ai",
+  "version": "0.10.1",
+  "description": "Compatibility shim for @shiftlabs/napkin",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js"
+  },
+  "bin": {
+    "napkin": "./cli.js"
+  },
+  "files": [
+    "index.js",
+    "cli.js",
+    "README.md"
+  ],
+  "dependencies": {
+    "@shiftlabs/napkin": "0.10.1"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shift-labs-ai/napkin.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

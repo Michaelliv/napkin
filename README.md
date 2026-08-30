@@ -5,7 +5,7 @@
 Every great idea started on a napkin.
 
 ```bash
-npm install -g napkin-ai
+npm install -g @shiftlabs/napkin
 ```
 
 Search runs on [ferrosearch](https://github.com/shift-labs-ai/ferrosearch),
@@ -46,7 +46,7 @@ napkin daily append "- [ ] Review PR"
 napkin is also a library. No CLI, no stdout - just data:
 
 ```typescript
-import { Napkin } from "napkin-ai";
+import { Napkin } from "@shiftlabs/napkin";
 
 // Always works - creates bare vault if needed
 const n = new Napkin("/path/to/project");

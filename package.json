@@ -1,11 +1,12 @@
 {
-  "name": "napkin-ai",
-  "version": "0.10.0",
+  "name": "@shiftlabs/napkin",
+  "version": "0.10.1",
   "description": "\ud83e\uddfb Knowledge system for agents. Local-first, file-based, progressively disclosed.",
   "type": "module",
   "main": "dist/index.js",
   "exports": {
-    ".": "./dist/index.js"
+    ".": "./dist/index.js",
+    "./cli": "./dist/main.js"
   },
   "bin": {
     "napkin": "./dist/main.js"
@@ -30,11 +31,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Michaelliv/napkin.git"
+    "url": "git+https://github.com/shift-labs-ai/napkin.git"
   },
-  "homepage": "https://github.com/Michaelliv/napkin#readme",
+  "homepage": "https://github.com/shift-labs-ai/napkin#readme",
   "bugs": {
-    "url": "https://github.com/Michaelliv/napkin/issues"
+    "url": "https://github.com/shift-labs-ai/napkin/issues"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "keywords": [
     "obsidian",

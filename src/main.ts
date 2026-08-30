@@ -141,7 +141,7 @@ Options:
 
 All commands support --json for structured output.
 More help: napkin <command> --help
-Docs: https://github.com/Michaelliv/napkin`);
+Docs: https://github.com/shift-labs-ai/napkin`);
 }
 
 // ── Getting started ─────────────────────────────────────────────────

@@ -55,11 +55,11 @@ describe("update command", () => {
     expect(calls).toEqual([
       {
         command: npmCommand,
-        args: ["install", "-g", "napkin-ai@latest"],
+        args: ["install", "-g", "@shiftlabs/napkin@latest"],
         options: { silent: false },
       },
     ]);
-    expect(logs.join("\n")).toContain("Updated napkin-ai@latest");
+    expect(logs.join("\n")).toContain("Updated @shiftlabs/napkin@latest");
   });
 
   test("returns structured JSON and silences npm output", async () => {
@@ -74,7 +74,7 @@ describe("update command", () => {
     expect(logs).toHaveLength(1);
     expect(JSON.parse(logs[0] ?? "")).toEqual({
       updated: true,
-      target: "napkin-ai@latest",
+      target: "@shiftlabs/napkin@latest",
     });
     expect(errors).toEqual([]);
   });
@@ -108,8 +108,8 @@ describe("update command", () => {
     expect(logs).toHaveLength(1);
     expect(JSON.parse(logs[0] ?? "")).toEqual({
       updated: false,
-      target: "napkin-ai@latest",
-      error: `${npmCommand} install -g napkin-ai@latest exited with status 2`,
+      target: "@shiftlabs/napkin@latest",
+      error: `${npmCommand} install -g @shiftlabs/napkin@latest exited with status 2`,
     });
     expect(errors).toEqual([]);
   });

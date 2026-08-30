@@ -8,7 +8,7 @@ import {
   success,
 } from "../utils/output.js";
 
-const target = "napkin-ai@latest";
+const target = "@shiftlabs/napkin@latest";
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const npmArgs = ["install", "-g", target];
 
