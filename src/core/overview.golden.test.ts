@@ -6,14 +6,14 @@ import { getOverview } from "./overview.js";
  * Characterization (golden) test for getOverview.
  *
  * The fixture vault deterministically exercises every code path in
- * overview.ts: weighted term sources (filename x2, frontmatter x2, body x1,
- * corroborated headings x2), heading corroboration filtering, phrase
- * preference, folder-token exclusion (singular/plural), junk gates (ID
- * slugs, vowelless blobs), noise stripping (code, URLs, emails, HTML,
- * GUIDs, digit blobs, hex runs), scaffold skipping (Templates/, NAPKIN.md,
+ * overview.ts: per-note fingerprints (title handles boosted over body
+ * terms), the outside-measured KB-common subtraction, probe validation and
+ * shared-fingerprint crediting, roster titles and the digit-collapse
+ * guard, folder-token exclusion (singular/plural), junk gates (ID slugs,
+ * vowelless blobs), noise stripping (code, URLs, emails, HTML, GUIDs,
+ * digit blobs, hex runs), scaffold skipping (Templates/, NAPKIN.md,
  * _about.md), depth limiting, malformed-frontmatter warnings,
- * homogeneous-sibling collapse, heterogeneous siblings kept separate, and
- * search-probe routability over the shared search corpus.
+ * homogeneous-sibling collapse, and heterogeneous siblings kept separate.
  *
  * Any behavior change in the overview pipeline must show up as a snapshot
  * diff. Performance refactors must keep this snapshot byte-identical.
@@ -81,7 +81,7 @@ Envelope ID: CCCC3333-4444-4555-FADE-CAB456789012
 Reserved parking slots on level B2. Guarantee covers parking fees and the
 bank guarantee renews annually with the lease agreement.`,
 
-  // people/: frontmatter values indexed, folder tokens (people/person) excluded
+  // people/: roster titles are the handles; folder tokens excluded
   "people/asha.md": `---
 role: VP Engineering
 location: Boston
@@ -108,6 +108,20 @@ This body is skipped for keywords but the note is counted.`,
   "deep/one/present.md":
     "# Present\nWithin depth, mentions telescopes twice: telescope optics, telescope mounts.",
 };
+
+// logs/: identical bodies behind date-only titles — shared-fingerprint
+// crediting deduplicates the cluster onto one probed handle
+for (let i = 1; i <= 4; i++) {
+  FIXTURE[`logs/2024-0${i}.md`] =
+    "# Log\nswiftcart marketplace sync swiftcart payload courier";
+}
+
+// releases/: digit-collapsed titles ("api-2" → "api") take the content
+// fingerprint path instead of the roster shortcut
+FIXTURE["releases/api-2.md"] =
+  "# api 2\nwebhooks pagination tokens webhooks retry budget";
+FIXTURE["releases/api-3.md"] =
+  "# api 3\nstreaming uploads chunked streaming resume markers";
 
 // imports/: six homogeneous siblings that must collapse into imports/
 const boilerplate = [

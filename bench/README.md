@@ -73,7 +73,7 @@ Data is downloaded automatically from HuggingFace on first run (except M which n
 ### Key design decisions
 
 - **Per-round notes** instead of full sessions: each note is ~2.5k chars instead of ~15k, giving BM25 search better granularity
-- **Day directories**: napkin's overview extracts TF-IDF keywords per directory, giving the agent a topical map of the vault
+- **Day directories**: napkin's overview selects search-validated keywords per directory, giving the agent a topical map of the vault
 - **Full assistant responses included**: many questions ask about what the assistant said previously - truncating assistant content drops answers
 - **Scenario date in system prompt**: prevents the model from using its real current date for relative time calculations ("X days ago")
 - **`--system-prompt` instead of `--append-system-prompt`**: avoids pi injecting a conflicting real date

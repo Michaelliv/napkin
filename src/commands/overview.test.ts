@@ -196,7 +196,8 @@ describe("overview", () => {
 
     const decisionsFolder = result.overview[0];
     expect(decisionsFolder.notes).toBe(1);
-    expect(decisionsFolder.keywords).toContain("postgresql");
+    // postgres.md is a 1-token roster title — the curated handle.
+    expect(decisionsFolder.keywords).toContain("postgres");
     expect(decisionsFolder.keywords).not.toContain("template");
     expect(decisionsFolder.keywords).not.toContain("decisions");
     // _about.md is excluded from stats but surfaces as the row description.
@@ -273,7 +274,7 @@ Two merchants need migration plans.`,
       overview: Array<{ path: string; keywords: string[] }>;
     };
     const decisionsFolder = result.overview.find((f) => f.path === "decisions");
-    expect(decisionsFolder?.keywords).toContain("postgresql");
+    expect(decisionsFolder?.keywords).toContain("postgres");
     expect(decisionsFolder?.keywords).toContain("outbox");
     expect(decisionsFolder?.keywords).toContain("braintree");
     expect(decisionsFolder?.keywords).not.toContain("context");
@@ -309,7 +310,9 @@ Reserved parking slots on level B2. Guarantee covers parking fees.`,
       expect(t).not.toBe("align");
       expect(t).not.toBe("nbsp");
     }
-    expect(tokens).toContain("guarantee");
+    // each note keeps a clean title-derived handle
+    expect(folder?.keywords).toContain("lease");
+    expect(folder?.keywords).toContain("parking");
 
     vault.cleanup();
   });
@@ -394,112 +397,122 @@ Reserved parking slots on level B2. Guarantee covers parking fees.`,
     vault.cleanup();
   });
 
-  // Five folders × 14 notes. "flurb" rides frontmatter values of 8 notes
-  // across 4 folders; harbor's first 8 notes carry capitalized "Quixotic"
-  // and lowercase "grimble" at equal concentration. Each note repeats half
-  // the folder's vocabulary (rotated by parity): bursty within notes,
-  // df ≈ 7 per word — under the vault-common bar. Vocabulary is capitalized
-  // mid-sentence: domain words carry naming evidence, as in real vaults.
-  function buildNamingEvidenceFixture(): Record<string, string> {
-    const vocab: Record<string, string[]> = {
-      harbor: ["berth", "mooring", "pilot", "tide", "quay", "dredge"],
-      orchard: ["graft", "pruning", "cider", "blossom", "rootstock", "crate"],
-      foundry: ["crucible", "ingot", "slag", "quench", "mold", "furnace"],
-      lab: ["reagent", "titration", "pipette", "assay", "buffer", "vial"],
-      apiary: ["brood", "nectar", "swarm", "queen", "frame", "varroa"],
-    };
-    const cap = (w: string) => w[0].toUpperCase() + w.slice(1);
-    const files: Record<string, string> = {};
-    const topics = Object.keys(vocab);
-    for (let f = 0; f < topics.length; f++) {
-      for (let i = 0; i < 14; i++) {
-        const fm = f < 4 && i < 2 ? "---\nsource: flurb\n---\n" : "";
-        const conc =
-          f === 0 && i < 8
-            ? "uses Quixotic here since Quixotic parses via Quixotic\nthen grimble runs and grimble halts while grimble waits\n"
-            : "";
-        const body = vocab[topics[f]]
-          .filter((_, k) => k % 2 === i % 2)
-          .map((w) => `uses ${cap(w)} as ${w} ${w}`)
-          .join(" ");
-        files[`${topics[f]}/note-${i}.md`] =
-          `${fm}# ${topics[f]} log ${i}\n${conc}${body}`;
-      }
-    }
-    return files;
-  }
-
-  test("frontmatter values do not certify dispersed words as domain vocabulary", async () => {
-    // "flurb" rides frontmatter values of 8 notes spread across 4 folders —
-    // dispersed, never a note name — so no folder may claim it. "Quixotic"
-    // is body-only but near-totally concentrated in one folder and
-    // capitalized mid-sentence (the "tedious" shape: a product name that
-    // never makes a filename) — that folder owns it. "grimble" has the same
-    // concentration with zero naming evidence (never titled, never
-    // capitalized) — prose machinery, shown nowhere. Each folder carries
-    // real vocabulary (bursty, below the vault-common bar) so no row
-    // starves into the relaxed filter tiers.
-    const vault = createTempVault(buildNamingEvidenceFixture());
-
-    const result = (await runOverviewJson(vault.projectPath)) as {
-      overview: Array<{ path: string; keywords: string[] }>;
-    };
-    const words = (p: string) =>
-      result.overview
-        .find((r) => r.path === p)
-        ?.keywords.flatMap((k) => k.split(" ")) ?? [];
-    for (const r of result.overview) {
-      expect(words(r.path)).not.toContain("flurb");
-      expect(words(r.path)).not.toContain("grimble");
-    }
-    expect(words("harbor")).toContain("quixotic");
-
-    vault.cleanup();
-  });
-
-  test("multi-topic folders decompose into name-backed topics", async () => {
-    // procedures/ mixes two named subdomains (swiftcart, payroll) plus unrelated
-    // singles. Topics carry content-grounded counts; a note titled
-    // otherwise but substantially discussing swiftcart still belongs to it.
+  test("shared fingerprints credit the chosen term instead of duplicating", async () => {
+    // Five identical logs behind date-only titles (no title terms at
+    // all): the first picks the handle, later notes are credited to it
+    // when the probe proves they are reachable through it — the row
+    // deduplicates and keywordNotes counts the shared coverage.
     const files: Record<string, string> = {};
     for (let i = 0; i < 5; i++) {
-      files[
-        `procedures/Swiftcart ${["Import", "Settlement", "Menu", "Venues", "Refunds"][i]}.md`
-      ] =
-        `# Swiftcart ${i}\nswiftcart marketplace sync swiftcart payload courier`;
+      files[`procedures/2026-0${i + 1}.md`] =
+        "# Log\nswiftcart marketplace sync swiftcart payload courier";
     }
-    for (let i = 0; i < 4; i++) {
-      files[
-        `procedures/Payroll ${["Export", "Approval", "Audit", "Calendar"][i]}.md`
-      ] = `# Payroll ${i}\npayroll ledger salary payroll withholding`;
-    }
-    files["procedures/Disguised Note.md"] =
-      "# Disguised\nswiftcart courier swiftcart dispatch zones swiftcart fees";
-    files["procedures/Loose End.md"] = "# Loose\nprinter toner replacement";
+    files["procedures/Payroll Export.md"] =
+      "# Payroll Export\npayroll ledger salary withholding export";
     const vault = createTempVault(files);
 
     const result = (await runOverviewJson(vault.projectPath)) as {
       overview: Array<{
         path: string;
-        topics?: Array<{ label: string; notes: number; terms: string[] }>;
+        keywords: string[];
+        keywordNotes: number[];
       }>;
     };
     const procedures = result.overview.find((f) => f.path === "procedures");
-    const labels = procedures?.topics?.map((t) => t.label) ?? [];
-    expect(labels).toContain("swiftcart");
-    expect(labels).toContain("payroll");
-    const swiftcart = procedures?.topics?.find((t) => t.label === "swiftcart");
-    // 5 titled + 1 disguised note that substantially discusses swiftcart
-    expect(swiftcart?.notes).toBe(6);
+    expect(procedures).toBeDefined();
+    const kw = procedures?.keywords ?? [];
+    // fewer handles than notes: the swiftcart cluster deduplicated
+    expect(kw.length).toBeLessThan(6);
+    const swiftcartIdx = kw.findIndex((k) => k.includes("swiftcart"));
+    expect(swiftcartIdx).toBeGreaterThanOrEqual(0);
+    // the shared handle carries multi-note credit
+    expect(procedures?.keywordNotes[swiftcartIdx]).toBeGreaterThanOrEqual(2);
+    // the singleton domain is still present
+    expect(kw.some((k) => k.includes("payroll"))).toBe(true);
+
+    vault.cleanup();
+  });
+
+  test("roster-titled notes are covered by their title, not body episodes", async () => {
+    // A person note's body is episode, not identity: the row lists the
+    // person, never the episode vocabulary.
+    const vault = createTempVault({
+      "people/Dana Arbel.md":
+        "# Dana Arbel\ntruck temperature relay saved shipment relay saved",
+      "people/Noa Peretz.md":
+        "# Noa Peretz\ninvoice dispute escalation invoice dispute",
+      "notes/context.md":
+        "# Context\nkubernetes ingress routing policies cluster",
+    });
+
+    const result = (await runOverviewJson(vault.projectPath)) as {
+      overview: Array<{ path: string; keywords: string[] }>;
+    };
+    const people = result.overview.find((f) => f.path === "people");
+    expect(people?.keywords).toContain("dana arbel");
+    expect(people?.keywords).toContain("noa peretz");
+    expect(people?.keywords).not.toContain("truck temperature");
+    expect(people?.keywords).not.toContain("invoice dispute");
+
+    vault.cleanup();
+  });
+
+  test("digit-collapsed titles are fingerprinted from content", async () => {
+    // "vex-0.14" tokenizes to just "vex" — not a roster identity. Each
+    // release note must surface its own content handle instead of all
+    // collapsing behind one shared word.
+    const vault = createTempVault({
+      "releases/vex-0.14.md":
+        "# vex 0.14\ninfiniti rollout actions cloud plugin infiniti",
+      "releases/vex-0.15.md":
+        "# vex 0.15\npublishing pages drafts publishing cut notes",
+      "notes/context.md":
+        "# Context\nkubernetes ingress routing policies cluster",
+    });
+
+    const result = (await runOverviewJson(vault.projectPath)) as {
+      overview: Array<{ path: string; keywords: string[] }>;
+    };
+    const releases = result.overview.find((f) => f.path === "releases");
+    const kw = releases?.keywords ?? [];
+    expect(kw.some((k) => k.includes("infiniti"))).toBe(true);
+    expect(kw.some((k) => k.includes("publishing"))).toBe(true);
+
+    vault.cleanup();
+  });
+
+  test("KB-common vocabulary is subtracted, measured outside the folder", async () => {
+    // "acme" saturates every note in both folders — furniture, banned.
+    // Folder-local ubiquity is ownership, not furniture: distinct
+    // vocabulary in each folder survives.
+    const files: Record<string, string> = {};
+    for (let i = 0; i < 8; i++) {
+      files[`harbor/log-${i}.md`] =
+        `# harbor log ${i}\nacme berth mooring tide acme dredge quay ${i}`;
+      files[`orchard/log-${i}.md`] =
+        `# orchard log ${i}\nacme graft pruning cider acme rootstock crate ${i}`;
+    }
+    const vault = createTempVault(files);
+
+    const result = (await runOverviewJson(vault.projectPath)) as {
+      overview: Array<{ path: string; keywords: string[] }>;
+    };
+    for (const row of result.overview) {
+      const tokens = row.keywords.flatMap((k) => k.split(" "));
+      expect(tokens).not.toContain("acme");
+    }
+    const harbor = result.overview.find((f) => f.path === "harbor");
+    const harborTokens = harbor?.keywords.flatMap((k) => k.split(" ")) ?? [];
+    expect(harborTokens.length).toBeGreaterThan(0);
 
     vault.cleanup();
   });
 
   test("entity rosters survive strong topic vocabulary", async () => {
-    // Six one-note entities with distinct 2-token names share a folder with
-    // chatty notes whose repeated vocabulary dominates every salience
-    // ranking. Roster terms are curated handles — the gain bar and the
-    // candidate-pool cut govern derived vocabulary only.
+    // Six one-note entities with distinct 2-token names share a folder
+    // with chatty notes whose repeated vocabulary dominates the term
+    // statistics. Roster terms are curated handles — every entity is
+    // listed regardless of what the chatty notes fingerprint.
     const files: Record<string, string> = {};
     const names = [
       "zorblatt corp",
@@ -543,60 +556,11 @@ Reserved parking slots on level B2. Guarantee covers parking fees.`,
     vault.cleanup();
   });
 
-  test("vault-ubiquitous names never become topics", async () => {
-    // "omniword" is discussed heavily in every other folder (the
-    // operator-name shape) and titles two procedure notes — under the
-    // per-folder gates it would qualify (name-backed, 7 of 15 notes, below
-    // the genre ceiling), but a term strong across most folders is vault
-    // furniture, not a topic.
-    const files: Record<string, string> = {};
-    for (let i = 0; i < 5; i++) {
-      files[
-        `procedures/Swiftcart ${["Import", "Settlement", "Menu", "Venues", "Refunds"][i]}.md`
-      ] =
-        `# Swiftcart ${i}\nomniword omniword swiftcart marketplace sync swiftcart payload`;
-    }
-    for (let i = 0; i < 4; i++) {
-      files[
-        `procedures/Payroll ${["Export", "Approval", "Audit", "Calendar"][i]}.md`
-      ] = `# Payroll ${i}\npayroll ledger salary payroll withholding`;
-    }
-    files["procedures/Omniword Sync.md"] =
-      "# Omniword Sync\nomniword omniword dispatch zones";
-    files["procedures/Omniword Setup.md"] =
-      "# Omniword Setup\nomniword omniword bootstrap";
-    for (let i = 0; i < 4; i++) {
-      files[`procedures/Note ${i}.md`] =
-        `# Note ${i}\nprinter toner replacement cycle ${i}`;
-    }
-    for (let f = 0; f < 3; f++) {
-      for (let i = 0; i < 12; i++) {
-        files[`area-${f}/note-${i}.md`] =
-          `# note ${i}\nomniword omniword topicless filler ${f}`;
-      }
-    }
-    const vault = createTempVault(files);
-
-    const result = (await runOverviewJson(vault.projectPath)) as {
-      overview: Array<{
-        path: string;
-        topics?: Array<{ label: string }>;
-      }>;
-    };
-    const procedures = result.overview.find((f) => f.path === "procedures");
-    const labels = procedures?.topics?.map((t) => t.label) ?? [];
-    expect(labels).toContain("swiftcart");
-    expect(labels).not.toContain("omniword");
-
-    vault.cleanup();
-  });
-
   test("a dominant folder keeps its own recurring vocabulary", async () => {
     // "flimjam" recurs in every note of a folder that is ~83% of the vault
-    // and titles two of them. Vault-common is measured outside the folder
-    // (0 external notes contain it) and the non-domain concentration bar is
-    // capped attainable — the vault's biggest domain may own its own
-    // vocabulary.
+    // and titles two of them. KB-common is measured outside the folder
+    // (0 external notes contain it) — the vault's biggest domain owns its
+    // own vocabulary.
     const files: Record<string, string> = {};
     for (let i = 0; i < 20; i++) {
       const name = i < 2 ? `flimjam log ${i}` : `event ${i}`;
@@ -618,7 +582,7 @@ Reserved parking slots on level B2. Guarantee covers parking fees.`,
     vault.cleanup();
   });
 
-  test("indexes frontmatter values without exposing folder-name keywords", async () => {
+  test("entity folders list their roster without folder-name keywords", async () => {
     const vault = createTempVault({
       "people/asha.md":
         "---\nrole: VP Engineering\nlocation: Boston\n---\n# Asha Mehta\nOwns platform strategy.",
@@ -630,8 +594,8 @@ Reserved parking slots on level B2. Guarantee covers parking fees.`,
       overview: Array<{ path: string; keywords: string[] }>;
     };
     const peopleFolder = result.overview.find((f) => f.path === "people");
-    expect(peopleFolder?.keywords).toContain("engineering");
-    expect(peopleFolder?.keywords).toContain("boston");
+    expect(peopleFolder?.keywords).toContain("asha");
+    expect(peopleFolder?.keywords).toContain("lukas");
     expect(peopleFolder?.keywords).not.toContain("people");
     expect(peopleFolder?.keywords).not.toContain("person");
 

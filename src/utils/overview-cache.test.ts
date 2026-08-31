@@ -96,10 +96,21 @@ describe("overview cache", () => {
   });
 
   test("different options are never served another variant's cache", () => {
-    const vault = createTempVault({
-      "notes/a.md":
-        "# Alpha\nkubernetes ingress routing policies cluster autoscaling telemetry dashboards",
-    });
+    // Seven distinct notes so the keywords cap bites at both 5 and 3.
+    const names = [
+      "kubernetes",
+      "sourdough",
+      "payroll",
+      "telescope",
+      "beehive",
+      "marathon",
+      "espresso",
+    ];
+    const files: Record<string, string> = {};
+    for (const name of names) {
+      files[`notes/${name}.md`] = `# ${name}\n${name} deep dive notes`;
+    }
+    const vault = createTempVault(files);
     try {
       const five = getOverview(vault.contentPath, vault.contentPath, {
         keywords: 5,

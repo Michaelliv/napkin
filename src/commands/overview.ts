@@ -8,7 +8,7 @@ import {
   warn,
 } from "../utils/output.js";
 
-/** One primer row: path, about, contains roster, topics, keywords, count. */
+/** One primer row: path, about, contains roster, index, count. */
 function printFolderRow(f: OverviewFolder): void {
   const collapsedNote = f.collapsedFolders
     ? dim(` (+${f.collapsedFolders} similar subfolders)`)
@@ -22,10 +22,6 @@ function printFolderRow(f: OverviewFolder): void {
     console.log(
       `  ${dim("contains:")} ${f.contains.join(", ")}${more > 0 ? dim(` (+${more} more)`) : ""}`,
     );
-  }
-  for (const t of f.topics ?? []) {
-    const terms = t.terms.length > 0 ? `: ${t.terms.join(", ")}` : "";
-    console.log(`  ${dim("·")} ${t.label} ${dim(`(${t.notes})`)}${terms}`);
   }
   if (f.keywords.length > 0) {
     console.log(`  ${dim("keywords:")} ${f.keywords.join(", ")}`);

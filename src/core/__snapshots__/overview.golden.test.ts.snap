@@ -8,88 +8,90 @@ Context note for the golden vault."
 ,
   "overview": [
     {
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "welcome",
-        "fixture",
-        "orientation",
-        "newcomers",
       ],
       "notes": 1,
       "path": "/",
       "tags": [],
     },
     {
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "note",
-        "kubernetes",
-        "ingress",
-        "pod",
       ],
       "notes": 1,
       "path": "areas/alpha",
       "tags": [],
     },
     {
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "note",
-        "payroll",
-        "tax",
-        "withholding",
       ],
       "notes": 1,
       "path": "areas/beta",
       "tags": [],
     },
     {
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "note",
-        "collimation",
-        "steps",
-        "reflector",
       ],
       "notes": 1,
       "path": "areas/delta",
       "tags": [],
     },
     {
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "note",
-        "beehive",
-        "winterization",
-        "varroa",
       ],
       "notes": 1,
       "path": "areas/epsilon",
       "tags": [],
     },
     {
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "note",
-        "sourdough",
-        "fermentation",
-        "hydration",
       ],
       "notes": 1,
       "path": "areas/gamma",
       "tags": [],
     },
     {
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "note",
-        "marathon",
-        "training",
-        "lactate",
       ],
       "notes": 1,
       "path": "areas/zeta",
       "tags": [],
     },
     {
+      "keywordNotes": [
+        1,
+        1,
+      ],
       "keywords": [
+        "lease",
         "parking",
-        "bank guarantee",
-        "lease agreement",
-        "envelope",
       ],
       "notes": 2,
       "path": "contracts",
@@ -97,14 +99,15 @@ Context note for the golden vault."
     },
     {
       "about": "Architecture Decision Records.",
+      "keywordNotes": [
+        1,
+        1,
+        1,
+      ],
       "keywords": [
-        "transactional",
-        "outbox",
         "braintree",
-        "postgresql",
-        "adopt",
+        "outbox",
         "postgres",
-        "accepted",
       ],
       "notes": 3,
       "path": "decisions",
@@ -115,22 +118,22 @@ Context note for the golden vault."
       ],
     },
     {
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "present",
-        "telescope",
-        "within depth",
-        "mentions",
       ],
       "notes": 1,
       "path": "deep/one",
       "tags": [],
     },
     {
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "buried",
-        "folder",
-        "beyond",
-        "limit",
       ],
       "notes": 1,
       "path": "deep/one/two",
@@ -146,42 +149,54 @@ Context note for the golden vault."
         "tenant-4",
         "tenant-5",
       ],
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "contract",
-        "converted",
-        "document",
-        "occupancy suite",
-        "lease term",
-        "floor",
-        "apply stated",
-        "insurance certificate",
-        "signature page",
-        "appendix",
-        "attached",
-        "required",
-        "landlord tenant",
-        "rent",
-        "schedule",
       ],
       "notes": 6,
       "path": "imports",
       "tags": [],
     },
     {
+      "keywordNotes": [
+        3,
+        1,
+      ],
+      "keywords": [
+        "swiftcart",
+        "marketplace",
+      ],
+      "notes": 4,
+      "path": "logs",
+      "tags": [],
+    },
+    {
+      "keywordNotes": [
+        1,
+        1,
+      ],
       "keywords": [
         "asha",
         "lukas",
-        "engineering",
-        "boston",
-        "staff",
-        "engineer",
-        "berlin",
       ],
       "notes": 3,
       "path": "people",
       "tags": [
         "leadership",
       ],
+    },
+    {
+      "keywordNotes": [
+        2,
+      ],
+      "keywords": [
+        "api",
+      ],
+      "notes": 2,
+      "path": "releases",
+      "tags": [],
     },
   ],
   "warnings": [
@@ -198,88 +213,90 @@ Context note for the golden vault."
 ,
   "overview": [
     {
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "welcome",
-        "fixture",
-        "orientation",
-        "newcomers",
       ],
       "notes": 1,
       "path": "/",
       "tags": [],
     },
     {
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "note",
-        "kubernetes",
-        "ingress",
-        "pod",
       ],
       "notes": 1,
       "path": "areas/alpha",
       "tags": [],
     },
     {
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "note",
-        "payroll",
-        "tax",
-        "withholding",
       ],
       "notes": 1,
       "path": "areas/beta",
       "tags": [],
     },
     {
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "note",
-        "collimation",
-        "steps",
-        "reflector",
       ],
       "notes": 1,
       "path": "areas/delta",
       "tags": [],
     },
     {
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "note",
-        "beehive",
-        "winterization",
-        "varroa",
       ],
       "notes": 1,
       "path": "areas/epsilon",
       "tags": [],
     },
     {
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "note",
-        "sourdough",
-        "fermentation",
-        "hydration",
       ],
       "notes": 1,
       "path": "areas/gamma",
       "tags": [],
     },
     {
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "note",
-        "marathon",
-        "training",
-        "lactate",
       ],
       "notes": 1,
       "path": "areas/zeta",
       "tags": [],
     },
     {
+      "keywordNotes": [
+        1,
+        1,
+      ],
       "keywords": [
+        "lease",
         "parking",
-        "bank guarantee",
-        "lease agreement",
-        "envelope",
       ],
       "notes": 2,
       "path": "contracts",
@@ -287,14 +304,15 @@ Context note for the golden vault."
     },
     {
       "about": "Architecture Decision Records.",
+      "keywordNotes": [
+        1,
+        1,
+        1,
+      ],
       "keywords": [
-        "transactional",
-        "outbox",
         "braintree",
-        "postgresql",
-        "adopt",
+        "outbox",
         "postgres",
-        "accepted",
       ],
       "notes": 3,
       "path": "decisions",
@@ -305,22 +323,22 @@ Context note for the golden vault."
       ],
     },
     {
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "present",
-        "telescope",
-        "within depth",
-        "mentions",
       ],
       "notes": 1,
       "path": "deep/one",
       "tags": [],
     },
     {
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "buried",
-        "folder",
-        "beyond",
-        "limit",
       ],
       "notes": 1,
       "path": "deep/one/two",
@@ -336,35 +354,54 @@ Context note for the golden vault."
         "tenant-4",
         "tenant-5",
       ],
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "contract",
-        "converted",
-        "document",
-        "occupancy suite",
-        "lease term",
-        "floor",
-        "apply stated",
-        "insurance certificate",
       ],
       "notes": 6,
       "path": "imports",
       "tags": [],
     },
     {
+      "keywordNotes": [
+        3,
+        1,
+      ],
+      "keywords": [
+        "swiftcart",
+        "marketplace",
+      ],
+      "notes": 4,
+      "path": "logs",
+      "tags": [],
+    },
+    {
+      "keywordNotes": [
+        1,
+        1,
+      ],
       "keywords": [
         "asha",
         "lukas",
-        "engineering",
-        "boston",
-        "staff",
-        "engineer",
-        "berlin",
       ],
       "notes": 3,
       "path": "people",
       "tags": [
         "leadership",
       ],
+    },
+    {
+      "keywordNotes": [
+        2,
+      ],
+      "keywords": [
+        "api",
+      ],
+      "notes": 2,
+      "path": "releases",
+      "tags": [],
     },
   ],
   "warnings": [
@@ -381,123 +418,90 @@ Context note for the golden vault."
 ,
   "overview": [
     {
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "welcome",
-        "fixture",
-        "orientation",
-        "newcomers",
-        "vault",
       ],
       "notes": 1,
       "path": "/",
       "tags": [],
     },
     {
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "note",
-        "kubernetes",
-        "ingress",
-        "pod",
-        "autoscaling",
-        "policies",
-        "routing",
       ],
       "notes": 1,
       "path": "areas/alpha",
       "tags": [],
     },
     {
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "note",
-        "payroll",
-        "tax",
-        "withholding",
-        "tables",
-        "hourly",
-        "contractors",
       ],
       "notes": 1,
       "path": "areas/beta",
       "tags": [],
     },
     {
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "note",
-        "collimation",
-        "steps",
-        "reflector",
-        "optics",
-        "telescope",
       ],
       "notes": 1,
       "path": "areas/delta",
       "tags": [],
     },
     {
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "note",
-        "beehive",
-        "winterization",
-        "varroa",
-        "mite",
-        "treatment",
       ],
       "notes": 1,
       "path": "areas/epsilon",
       "tags": [],
     },
     {
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "note",
-        "sourdough",
-        "fermentation",
-        "hydration",
-        "ratios",
-        "schedules",
       ],
       "notes": 1,
       "path": "areas/gamma",
       "tags": [],
     },
     {
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "note",
-        "marathon",
-        "training",
-        "lactate",
-        "threshold",
-        "pacing",
       ],
       "notes": 1,
       "path": "areas/zeta",
       "tags": [],
     },
     {
+      "keywordNotes": [
+        1,
+        1,
+      ],
       "keywords": [
+        "lease",
         "parking",
-        "bank guarantee",
-        "lease agreement",
-        "envelope",
-        "docusign",
-        "third",
-        "pays",
-        "monthly",
-        "hash",
-        "sublease",
-        "approval",
-        "code",
-        "block",
-        "reference",
-        "invoice",
-        "reserved",
-        "slots",
-        "level",
-        "covers",
-        "fees",
-        "renews",
-        "annually",
-        "contact",
-        "requires",
       ],
       "notes": 2,
       "path": "contracts",
@@ -505,14 +509,15 @@ Context note for the golden vault."
     },
     {
       "about": "Architecture Decision Records.",
+      "keywordNotes": [
+        1,
+        1,
+        1,
+      ],
       "keywords": [
-        "transactional",
-        "outbox",
         "braintree",
-        "postgresql",
-        "adopt",
+        "outbox",
         "postgres",
-        "accepted",
       ],
       "notes": 3,
       "path": "decisions",
@@ -523,112 +528,131 @@ Context note for the golden vault."
       ],
     },
     {
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "present",
-        "telescope",
-        "within depth",
-        "mentions",
-        "twice",
-        "mounts",
-        "optics",
       ],
       "notes": 1,
       "path": "deep/one",
       "tags": [],
     },
     {
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "buried",
-        "folder",
-        "beyond",
-        "limit",
-        "depth",
       ],
       "notes": 1,
       "path": "deep/one/two",
       "tags": [],
     },
     {
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "contract",
-        "appendix bank",
-        "schedule",
-        "term",
       ],
       "notes": 1,
       "path": "imports/tenant-0",
       "tags": [],
     },
     {
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "contract",
-        "attached bank",
-        "signature",
-        "page",
       ],
       "notes": 1,
       "path": "imports/tenant-1",
       "tags": [],
     },
     {
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "contract",
-        "lease",
-        "attached rent",
-        "appendix suite",
       ],
       "notes": 1,
       "path": "imports/tenant-2",
       "tags": [],
     },
     {
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "contract",
-        "appendix bank",
-        "schedule",
-        "term",
       ],
       "notes": 1,
       "path": "imports/tenant-3",
       "tags": [],
     },
     {
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "contract",
-        "attached bank",
-        "signature",
-        "page",
       ],
       "notes": 1,
       "path": "imports/tenant-4",
       "tags": [],
     },
     {
+      "keywordNotes": [
+        1,
+      ],
       "keywords": [
         "contract",
-        "lease",
-        "attached rent",
-        "appendix suite",
       ],
       "notes": 1,
       "path": "imports/tenant-5",
       "tags": [],
     },
     {
+      "keywordNotes": [
+        3,
+        1,
+      ],
+      "keywords": [
+        "swiftcart",
+        "marketplace",
+      ],
+      "notes": 4,
+      "path": "logs",
+      "tags": [],
+    },
+    {
+      "keywordNotes": [
+        1,
+        1,
+      ],
       "keywords": [
         "asha",
         "lukas",
-        "engineering",
-        "boston",
-        "staff",
-        "engineer",
-        "berlin",
       ],
       "notes": 3,
       "path": "people",
       "tags": [
         "leadership",
       ],
+    },
+    {
+      "keywordNotes": [
+        2,
+      ],
+      "keywords": [
+        "api",
+      ],
+      "notes": 2,
+      "path": "releases",
+      "tags": [],
     },
   ],
   "warnings": [
