@@ -73,7 +73,7 @@ Each note proposes its top candidates by `log(1+tf) × idf`, with the note's
 own name terms boosted (×2.5 for title phrases, ×1.8 for title words) — a
 note's curated name is its handle; body tokens are the fallback. Without
 the boost, a rare body unigram ("dip") outbids the note's own title bigram
-("salad orders"): routable but mute.
+("night bakery"): routable but mute.
 
 **Fingerprint proposes, probe disposes**: candidates are fired at the
 shared search corpus (`loadSearchCorpus` — the exact ranking `napkin
@@ -90,8 +90,8 @@ they are the row's de-facto domains. Word-set identity ("rows cols" ≡
 
 ### 5. Rosters
 
-Full 1–2-token note titles ("gong", "ilia kesler") are curated handles by
-definition: one-note-per-entity folders list their entities. Roster titles
+Full 1–2-token note titles ("meridian", "dana arbel") are curated handles
+by definition: one-note-per-entity folders list their entities. Roster titles
 are exempt from the KB-common subtraction in their home folder — an
 entity's home row shows its name however widely the entity is discussed
 elsewhere — and roster-titled notes skip body fingerprinting: a person
@@ -161,8 +161,8 @@ least one displayed handle.
 
 ```
 procedures/
-  keywords: recall drill, customer notification, thursday dispatch, salad orders,
-            forecast actuals, bakery benchmark, staff performance, sap allergen, …
+  keywords: recall drill, holiday forecast, traceability intake, stockout report,
+            barcode nutrition, staff performance, night bakery weekly, …
   notes: 127
 ```
 

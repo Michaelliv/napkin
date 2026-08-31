@@ -1,4 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { createTempVault } from "../utils/test-helpers.js";
 import { getOverview } from "./overview.js";
 
@@ -149,6 +151,16 @@ for (const [name, body] of topics) {
 }
 
 const vault = createTempVault(FIXTURE);
+// Search ranking blends in recency from real mtimes; temp-vault files land
+// 0–2ms apart in creation order, which straddles ranking-tie boundaries
+// nondeterministically. Pinned, path-ordered mtimes make recency exact.
+const BASE_TIME = new Date("2024-06-01T12:00:00Z").getTime();
+Object.keys(FIXTURE)
+  .sort()
+  .forEach((file, i) => {
+    const t = new Date(BASE_TIME + i * 1000);
+    fs.utimesSync(path.join(vault.contentPath, file), t, t);
+  });
 afterAll(() => vault.cleanup());
 
 describe("getOverview golden", () => {

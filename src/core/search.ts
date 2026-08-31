@@ -215,7 +215,10 @@ export function loadSearchCorpus(
           content: doc.content,
         };
       });
-      scored.sort((a, b) => b.score - a.score);
+      // Deterministic tie-break: rounded composites tie often, and the
+      // native index's internal order differs across platforms — rankings
+      // must not.
+      scored.sort((a, b) => b.score - a.score || a.file.localeCompare(b.file));
       return scored;
     },
   };

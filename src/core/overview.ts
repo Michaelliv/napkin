@@ -180,9 +180,9 @@ interface FolderData {
    */
   bodyTF: Map<string, number>;
   /**
-   * Full note titles of 1–2 tokens ("gong", "ilia kesler") — the folder's
-   * entity roster. A fragment of a longer title ("render" from "HTML Deck
-   * Rendering") is not a roster entry.
+   * Full note titles of 1–2 tokens ("meridian", "dana arbel") — the
+   * folder's entity roster. A fragment of a longer title ("render" from
+   * "HTML Deck Rendering") is not a roster entry.
    */
   rosterTitles: Set<string>;
   tags: Set<string>;
@@ -723,9 +723,14 @@ function selectKeywords(
 
   const admissible = (term: string): boolean => {
     if (taken.has(term)) return false;
-    if (term.split(" ").some((w) => excluded.has(w))) return false;
+    const words = term.split(" ");
+    if (words.some((w) => excluded.has(w))) return false;
     if (isJunkTerm(term, ctx.idBlocklist, ctx.vaultStats)) return false;
-    return !kbCommon(term);
+    // Roster titles pass whole: an entity's home row shows its name.
+    if (data.rosterTitles.has(term)) return true;
+    // A phrase wrapping a furniture word ("berth acme") smuggles the
+    // furniture back in — the subtraction applies to every word.
+    return !kbCommon(term) && !words.some((w) => words.length > 1 && kbCommon(w));
   };
 
   /**
@@ -749,8 +754,8 @@ function selectKeywords(
   /**
    * The note's handle: its admissible candidates scored by tf × idf with
    * the note's curated name boosted — without the boost, a rare body
-   * unigram ("dip", "candle") outbids the note's own title bigram ("salad
-   * orders"): routable but mute. Fingerprint proposes, probe disposes: the
+   * unigram ("dip", "candle") outbids the note's own title bigram ("night
+   * bakery"): routable but mute. Fingerprint proposes, probe disposes: the
    * first candidate whose top hits include the note wins. When none
    * validates (the note loses every BM25 race to neighbors), the best
    * fingerprint still represents it — an unroutable handle beats
