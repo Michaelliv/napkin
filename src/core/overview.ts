@@ -730,7 +730,9 @@ function selectKeywords(
     if (data.rosterTitles.has(term)) return true;
     // A phrase wrapping a furniture word ("berth acme") smuggles the
     // furniture back in — the subtraction applies to every word.
-    return !kbCommon(term) && !words.some((w) => words.length > 1 && kbCommon(w));
+    return (
+      !kbCommon(term) && !words.some((w) => words.length > 1 && kbCommon(w))
+    );
   };
 
   /**
