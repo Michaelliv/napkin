@@ -1,4 +1,8 @@
-import { loadConfig, updateConfig } from "../utils/config.js";
+import {
+  loadConfig,
+  type NapkinConfig,
+  updateConfig,
+} from "../utils/config.js";
 
 export { loadConfig };
 
@@ -20,7 +24,7 @@ export function setConfigValue(
   configPath: string,
   key: string,
   rawValue: string,
-): { config: Record<string, unknown>; parsed: unknown } {
+): { config: NapkinConfig; parsed: unknown } {
   const parts = key.split(".");
   const obj: Record<string, unknown> = {};
   let current = obj;
@@ -37,6 +41,5 @@ export function setConfigValue(
   }
   current[parts[parts.length - 1]] = parsed;
 
-  const updated = updateConfig(configPath, obj);
-  return { config: updated as unknown as Record<string, unknown>, parsed };
+  return { config: updateConfig(configPath, obj), parsed };
 }

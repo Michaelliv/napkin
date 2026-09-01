@@ -377,6 +377,17 @@ describe("public config exports", () => {
     const opts: SearchOptions = { limit: DEFAULT_CONFIG.search.limit };
     expect(n.search("vault", opts).length).toBeGreaterThan(0);
   });
+
+  test("the SDK hands back the config as NapkinConfig", () => {
+    const cfg: NapkinConfig = n.config();
+    expect(typeof cfg.overview.keywords).toBe("number");
+
+    const { config: updated }: { config: NapkinConfig } = n.configSet(
+      "search.limit",
+      "42",
+    );
+    expect(updated.search.limit).toBe(42);
+  });
 });
 
 // ── Static methods ────────────────────────────────────────────────
