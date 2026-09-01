@@ -1,5 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
+import type { VaultInfo } from "./vault.js";
 import { CONFIG_FILE } from "./vault-internals.js";
 
 export interface VaultLayout {
@@ -63,10 +64,41 @@ export const DEFAULT_CONFIG: NapkinConfig = {
 };
 
 /**
+ * A private, immutable copy of a caller-supplied config.
+ *
+ * Copied so later edits to the caller's object cannot change an instance
+ * already built from it; frozen so the instance cannot hand out a
+ * configuration the caller can mutate underneath it.
+ */
+export function freezeConfig(config: NapkinConfig): NapkinConfig {
+  return deepFreeze(structuredClone(config));
+}
+
+function deepFreeze<T>(value: T): T {
+  if (value && typeof value === "object") {
+    for (const nested of Object.values(value)) deepFreeze(nested);
+    Object.freeze(value);
+  }
+  return value;
+}
+
+/**
+ * The configuration in force for a vault: the one supplied in code at
+ * construction, or the vault's config.json.
+ *
+ * Every internal read goes through here, and `loadConfig` is private to
+ * this module, so reaching a vault's settings without honouring injection
+ * is a compile error rather than a bug to be found later.
+ */
+export function effectiveConfig(vault: VaultInfo): NapkinConfig {
+  return vault.config ?? loadConfig(vault.configPath);
+}
+
+/**
  * Load napkin config from config.json in the .napkin/ directory.
  * Missing fields fall back to defaults.
  */
-export function loadConfig(napkinDir: string): NapkinConfig {
+function loadConfig(napkinDir: string): NapkinConfig {
   const configPath = path.join(napkinDir, CONFIG_FILE);
   if (!fs.existsSync(configPath)) return { ...DEFAULT_CONFIG };
   try {

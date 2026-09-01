@@ -165,12 +165,12 @@ afterAll(() => vault.cleanup());
 
 describe("getOverview golden", () => {
   test("default options", () => {
-    const result = getOverview(vault.contentPath, vault.contentPath);
+    const result = getOverview(vault.vault);
     expect(result).toMatchSnapshot();
   });
 
   test("depth 3, keywords 8", () => {
-    const result = getOverview(vault.contentPath, vault.contentPath, {
+    const result = getOverview(vault.vault, {
       depth: 3,
       keywords: 8,
     });
@@ -178,7 +178,7 @@ describe("getOverview golden", () => {
   });
 
   test("collapse disabled", () => {
-    const result = getOverview(vault.contentPath, vault.contentPath, {
+    const result = getOverview(vault.vault, {
       collapse: false,
       depth: 3,
     });

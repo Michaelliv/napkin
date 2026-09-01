@@ -1,11 +1,12 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { FerroSearch } from "@shift-labs/ferrosearch";
-import { loadConfig } from "../utils/config.js";
+import { effectiveConfig } from "../utils/config.js";
 import { buildLinkResolver, listFiles } from "../utils/files.js";
 import { computeFingerprint } from "../utils/fingerprint.js";
 import { extractLinks } from "../utils/markdown.js";
 import { loadSearchCache, saveSearchCache } from "../utils/search-cache.js";
+import type { VaultInfo } from "../utils/vault.js";
 
 export interface SearchResult {
   file: string;
@@ -157,10 +158,10 @@ export interface SearchCorpus {
  * their notion of "what this query returns" can never disagree.
  */
 export function loadSearchCorpus(
-  contentPath: string,
-  configPath: string,
+  vault: VaultInfo,
   folder?: string,
 ): SearchCorpus {
+  const { contentPath, configPath } = vault;
   const fingerprint = computeFingerprint(contentPath, folder);
   const cached = loadSearchCache(configPath, fingerprint);
 
@@ -225,13 +226,12 @@ export function loadSearchCorpus(
 }
 
 export function searchVault(
-  contentPath: string,
-  configPath: string,
+  vault: VaultInfo,
   query: string,
   opts?: SearchOptions,
 ): SearchResult[] {
-  const config = loadConfig(configPath);
-  const corpus = loadSearchCorpus(contentPath, configPath, opts?.path);
+  const config = effectiveConfig(vault);
+  const corpus = loadSearchCorpus(vault, opts?.path);
 
   const contextLines = opts?.snippetLines ?? config.search.snippetLines;
   const limit = opts?.limit ?? config.search.limit;

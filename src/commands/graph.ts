@@ -461,8 +461,8 @@ export async function graph(
     process.exit(EXIT_NO_VAULT);
   }
 
-  const { loadConfig } = await import("../utils/config.js");
-  const config = loadConfig(vaultInfo.configPath);
+  const { effectiveConfig } = await import("../utils/config.js");
+  const config = effectiveConfig(vaultInfo);
   const renderer = config.graph?.renderer ?? "auto";
 
   const { nodes, links } = buildGraphData(vault, config.templates.folder);

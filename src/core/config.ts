@@ -1,13 +1,12 @@
 import {
-  loadConfig,
+  effectiveConfig,
   type NapkinConfig,
   updateConfig,
 } from "../utils/config.js";
+import type { VaultInfo } from "../utils/vault.js";
 
-export { loadConfig };
-
-export function getConfigValue(configPath: string, key: string): unknown {
-  const config = loadConfig(configPath);
+export function getConfigValue(vault: VaultInfo, key: string): unknown {
+  const config = effectiveConfig(vault);
   const parts = key.split(".");
   let value: unknown = config;
   for (const part of parts) {
@@ -20,11 +19,25 @@ export function getConfigValue(configPath: string, key: string): unknown {
   return value;
 }
 
+/**
+ * Write one dotted key into the vault's config.json.
+ *
+ * Refused when the configuration is injected: the instance reads its
+ * settings from code, so a write here would change a file it never
+ * consults — a caller would be told the setting took effect when it did
+ * not.
+ */
 export function setConfigValue(
-  configPath: string,
+  vault: VaultInfo,
   key: string,
   rawValue: string,
 ): { config: NapkinConfig; parsed: unknown } {
+  if (vault.config) {
+    throw new Error(
+      "config is injected in code; edit the source, not the vault",
+    );
+  }
+
   const parts = key.split(".");
   const obj: Record<string, unknown> = {};
   let current = obj;
@@ -41,5 +54,5 @@ export function setConfigValue(
   }
   current[parts[parts.length - 1]] = parsed;
 
-  return { config: updateConfig(configPath, obj), parsed };
+  return { config: updateConfig(vault.configPath, obj), parsed };
 }

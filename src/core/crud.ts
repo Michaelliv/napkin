@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { loadConfig } from "../utils/config.js";
+import { effectiveConfig } from "../utils/config.js";
 import { listFiles, resolveFile } from "../utils/files.js";
 import { parseFrontmatter } from "../utils/frontmatter.js";
 import type { VaultInfo } from "../utils/vault.js";
@@ -63,7 +63,7 @@ export function createFile(v: VaultInfo, opts: CreateOptions): CreateResult {
   let content = opts.content || "";
 
   if (opts.template) {
-    const config = loadConfig(v.configPath);
+    const config = effectiveConfig(v);
     const templateRef =
       resolveFile(v.contentPath, opts.template) ||
       resolveFile(v.contentPath, `${config.templates.folder}/${opts.template}`);

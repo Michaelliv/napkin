@@ -23,7 +23,7 @@ import {
   removeCanvasNode,
   resolveCanvas,
 } from "./core/canvas.js";
-import { getConfigValue, loadConfig, setConfigValue } from "./core/config.js";
+import { getConfigValue, setConfigValue } from "./core/config.js";
 import {
   appendFile,
   type CreateOptions,
@@ -103,15 +103,36 @@ import { getVaultMetadata, type VaultMetadata } from "./core/vault.js";
 import { getWordCount, type WordCount } from "./core/wordcount.js";
 import { registerTemplate } from "./templates/index.js";
 import type { VaultTemplate } from "./templates/types.js";
-import type { NapkinConfig } from "./utils/config.js";
+import {
+  effectiveConfig,
+  freezeConfig,
+  type NapkinConfig,
+} from "./utils/config.js";
 import type { Heading } from "./utils/markdown.js";
 import { findVault, type VaultInfo } from "./utils/vault.js";
+
+export interface NapkinOptions {
+  /**
+   * Configuration supplied in code. When given it is the whole
+   * configuration for this instance — including the vault layout, whose
+   * `vault` key is read from here rather than from disk — and
+   * .napkin/config.json is never read on any of its code paths. Per-call
+   * options still win per field, falling back to this instead of the file.
+   *
+   * The object is copied and frozen, so neither later edits to the caller's
+   * object nor edits to the vault file change what this instance does.
+   */
+  config?: NapkinConfig;
+}
 
 export class Napkin {
   readonly vault: VaultInfo;
 
-  constructor(path: string) {
-    this.vault = findVault(path);
+  constructor(path: string, options?: NapkinOptions) {
+    this.vault = findVault(
+      path,
+      options?.config ? freezeConfig(options.config) : undefined,
+    );
   }
 
   // ── Vault ───────────────────────────────────────────────────────
@@ -121,18 +142,13 @@ export class Napkin {
   }
 
   overview(opts?: OverviewOptions): VaultOverview {
-    return getOverview(this.vault.contentPath, this.vault.configPath, opts);
+    return getOverview(this.vault, opts);
   }
 
   // ── Search ──────────────────────────────────────────────────────
 
   search(query: string, opts?: SearchOptions): SearchResult[] {
-    return searchVault(
-      this.vault.contentPath,
-      this.vault.configPath,
-      query,
-      opts,
-    );
+    return searchVault(this.vault, query, opts);
   }
 
   // ── CRUD ────────────────────────────────────────────────────────
@@ -194,7 +210,7 @@ export class Napkin {
   // ── Daily ───────────────────────────────────────────────────────
 
   dailyPath(date?: Date): string {
-    return getDailyPath(this.vault.configPath, date);
+    return getDailyPath(this.vault, date);
   }
 
   dailyEnsure(): { path: string; created: boolean } {
@@ -347,18 +363,18 @@ export class Napkin {
   // ── Config ──────────────────────────────────────────────────────
 
   config(): NapkinConfig {
-    return loadConfig(this.vault.configPath);
+    return effectiveConfig(this.vault);
   }
 
   configGet(key: string): unknown {
-    return getConfigValue(this.vault.configPath, key);
+    return getConfigValue(this.vault, key);
   }
 
   configSet(
     key: string,
     value: string,
   ): { config: NapkinConfig; parsed: unknown } {
-    return setConfigValue(this.vault.configPath, key, value);
+    return setConfigValue(this.vault, key, value);
   }
 
   // ── Bases ───────────────────────────────────────────────────────

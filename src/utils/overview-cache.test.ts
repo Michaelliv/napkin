@@ -28,7 +28,7 @@ describe("overview cache", () => {
   test("writes a cache file on first run", () => {
     const vault = createTempVault({ "notes/a.md": NOTE_A });
     try {
-      getOverview(vault.contentPath, vault.contentPath);
+      getOverview(vault.vault);
       expect(
         fs.existsSync(path.join(vault.contentPath, OVERVIEW_CACHE_FILE)),
       ).toBe(true);
@@ -42,14 +42,14 @@ describe("overview cache", () => {
     const notePath = path.join(vault.contentPath, "notes/a.md");
     try {
       freezeMtime(notePath);
-      const first = getOverview(vault.contentPath, vault.contentPath);
+      const first = getOverview(vault.vault);
       expect(first.overview[0].keywords).toContain("kubernetes");
 
       // rewrite content but keep the identical mtime → fingerprint unchanged
       fs.writeFileSync(notePath, NOTE_A2);
       freezeMtime(notePath);
 
-      const second = getOverview(vault.contentPath, vault.contentPath);
+      const second = getOverview(vault.vault);
       expect(second).toEqual(first); // served from cache, file not re-read
     } finally {
       vault.cleanup();
@@ -61,14 +61,14 @@ describe("overview cache", () => {
     const notePath = path.join(vault.contentPath, "notes/a.md");
     try {
       freezeMtime(notePath);
-      const first = getOverview(vault.contentPath, vault.contentPath);
+      const first = getOverview(vault.vault);
       expect(first.overview[0].keywords).toContain("kubernetes");
 
       fs.writeFileSync(notePath, NOTE_A2);
       const later = new Date(FIXED_TIME.getTime() + 5000);
       fs.utimesSync(notePath, later, later);
 
-      const second = getOverview(vault.contentPath, vault.contentPath);
+      const second = getOverview(vault.vault);
       expect(second.overview[0].keywords).toContain("sourdough");
       expect(second.overview[0].keywords).not.toContain("kubernetes");
     } finally {
@@ -80,15 +80,15 @@ describe("overview cache", () => {
     const vault = createTempVault({ "notes/a.md": NOTE_A });
     const bPath = path.join(vault.contentPath, "notes/b.md");
     try {
-      const first = getOverview(vault.contentPath, vault.contentPath);
+      const first = getOverview(vault.vault);
       expect(first.overview[0].notes).toBe(1);
 
       fs.writeFileSync(bPath, NOTE_B);
-      const second = getOverview(vault.contentPath, vault.contentPath);
+      const second = getOverview(vault.vault);
       expect(second.overview[0].notes).toBe(2);
 
       fs.rmSync(bPath);
-      const third = getOverview(vault.contentPath, vault.contentPath);
+      const third = getOverview(vault.vault);
       expect(third.overview[0].notes).toBe(1);
     } finally {
       vault.cleanup();
@@ -112,18 +112,18 @@ describe("overview cache", () => {
     }
     const vault = createTempVault(files);
     try {
-      const five = getOverview(vault.contentPath, vault.contentPath, {
+      const five = getOverview(vault.vault, {
         keywords: 5,
       });
       expect(five.overview[0].keywords.length).toBe(5);
 
-      const three = getOverview(vault.contentPath, vault.contentPath, {
+      const three = getOverview(vault.vault, {
         keywords: 3,
       });
       expect(three.overview[0].keywords.length).toBe(3);
 
       // and back: no stale first variant either
-      const fiveAgain = getOverview(vault.contentPath, vault.contentPath, {
+      const fiveAgain = getOverview(vault.vault, {
         keywords: 5,
       });
       expect(fiveAgain.overview[0].keywords.length).toBe(5);
@@ -136,10 +136,10 @@ describe("overview cache", () => {
     const vault = createTempVault({ "notes/a.md": NOTE_A });
     const cachePath = path.join(vault.contentPath, OVERVIEW_CACHE_FILE);
     try {
-      getOverview(vault.contentPath, vault.contentPath);
+      getOverview(vault.vault);
       fs.writeFileSync(cachePath, "{not json!!");
 
-      const result = getOverview(vault.contentPath, vault.contentPath);
+      const result = getOverview(vault.vault);
       expect(result.overview[0].keywords).toContain("kubernetes");
       // cache restored to a valid state
       const raw = JSON.parse(fs.readFileSync(cachePath, "utf-8"));
@@ -156,8 +156,8 @@ describe("overview cache", () => {
       "notes/bad.md": "---\ntags: [#broken, #cache-test]\n---\n# Bad",
     });
     try {
-      const first = getOverview(vault.contentPath, vault.contentPath);
-      const second = getOverview(vault.contentPath, vault.contentPath);
+      const first = getOverview(vault.vault);
+      const second = getOverview(vault.vault);
       expect(second.context).toBe("# Context note");
       expect(second.warnings).toEqual([
         "Skipping notes/bad.md (malformed YAML frontmatter)",

@@ -60,6 +60,17 @@ napkin config set --key search.limit --value 50
 
 CLI flags > `config.json` > hardcoded defaults
 
+For an SDK instance built with `new Napkin(path, { config })`, the injected
+config replaces `config.json` outright:
+
+per-call options > injected config
+
+Nothing on that instance reads the file — not the vault layout, not the
+templates folder, not the daily settings — and `configSet` throws rather than
+writing a file the instance would ignore. This is for callers that own their
+tuning in code and need it to stay that way: a stored value cannot win on some
+path they did not think to check. See the SDK section of the README.
+
 ## File location
 
 ```

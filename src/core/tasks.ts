@@ -24,7 +24,7 @@ export function collectTasks(
   let files: string[];
 
   if (opts.daily) {
-    const dp = getDailyPath(vault.configPath);
+    const dp = getDailyPath(vault);
     files = fs.existsSync(path.join(vault.contentPath, dp)) ? [dp] : [];
   } else if (opts.file) {
     const r = resolveFile(vault.contentPath, opts.file);
@@ -81,7 +81,7 @@ export function resolveTaskLocation(
 
   if (opts.daily) {
     return {
-      filePath: getDailyPath(vault.configPath),
+      filePath: getDailyPath(vault),
       lineNum: Number.parseInt(opts.line || "0", 10),
     };
   }

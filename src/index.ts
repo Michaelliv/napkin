@@ -26,6 +26,7 @@ export type { TagInfo } from "./core/tags.js";
 export type { TaskShowResult, TaskWithFile } from "./core/tasks.js";
 export type { VaultMetadata } from "./core/vault.js";
 export type { WordCount } from "./core/wordcount.js";
+export type { NapkinOptions } from "./sdk.js";
 export { Napkin } from "./sdk.js";
 export type { VaultTemplate } from "./templates/types.js";
 export type { NapkinConfig, VaultLayout } from "./utils/config.js";

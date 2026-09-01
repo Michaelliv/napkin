@@ -35,12 +35,12 @@ afterEach(() => {
 
 describe("getDailyPath", () => {
   test("returns path based on config", () => {
-    const dp = getDailyPath(v.contentPath);
+    const dp = getDailyPath(v.vault);
     expect(dp).toBe(`Inbox/Daily/${todayStr()}.md`);
   });
 
   test("formats custom date", () => {
-    const dp = getDailyPath(v.contentPath, new Date(2026, 0, 15));
+    const dp = getDailyPath(v.vault, new Date(2026, 0, 15));
     expect(dp).toBe("Inbox/Daily/2026-01-15.md");
   });
 });

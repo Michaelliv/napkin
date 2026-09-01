@@ -89,7 +89,7 @@ describe("minisearch cache migration", () => {
     // Vaults in the wild have search-cache.json blobs serialized by
     // minisearch (napkin < ferrosearch swap). ferrosearch reads the same
     // version-2 format, so old caches must keep working without a rebuild.
-    const fresh = searchVault(vault.contentPath, vault.contentPath, "alpha");
+    const fresh = searchVault(vault.vault, "alpha");
     expect(fresh.length).toBeGreaterThan(0);
 
     const files = ["README.md", "Projects/alpha.md", "Projects/beta.md"];
@@ -119,11 +119,7 @@ describe("minisearch cache migration", () => {
       backlinkCounts: {},
     });
 
-    const fromLegacyCache = searchVault(
-      vault.contentPath,
-      vault.contentPath,
-      "alpha",
-    );
+    const fromLegacyCache = searchVault(vault.vault, "alpha");
     expect(fromLegacyCache.map((r) => [r.file, r.score])).toEqual(
       fresh.map((r) => [r.file, r.score]),
     );

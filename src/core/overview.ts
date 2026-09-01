@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { loadConfig } from "../utils/config.js";
+import { effectiveConfig } from "../utils/config.js";
 import { listFiles } from "../utils/files.js";
 import { computeFingerprint } from "../utils/fingerprint.js";
 import { parseFrontmatter } from "../utils/frontmatter.js";
@@ -9,6 +9,7 @@ import {
   loadOverviewCache,
   saveOverviewCache,
 } from "../utils/overview-cache.js";
+import type { VaultInfo } from "../utils/vault.js";
 import { loadSearchCorpus, type SearchCorpus } from "./search.js";
 import { termCounts, tokenize } from "./tokenizer.js";
 
@@ -905,18 +906,18 @@ function claimedByDescendants(
 }
 
 function buildOverviewFolders(
-  contentPath: string,
-  configPath: string,
+  vault: VaultInfo,
   maxDepth: number,
   maxKeywords: number,
   templatesFolder: string,
   collapse: boolean,
 ): { folders: OverviewFolder[]; warnings: string[] } {
+  const { contentPath } = vault;
   const files = listFiles(contentPath, { ext: "md" });
   const folderFiles = groupFilesByFolder(files, templatesFolder);
-  const vault = collectVaultData(contentPath, folderFiles, maxDepth);
-  const { vaultStats, vaultNotes, idBlocklist, warnings } = vault;
-  let { folderData } = vault;
+  const collected = collectVaultData(contentPath, folderFiles, maxDepth);
+  const { vaultStats, vaultNotes, idBlocklist, warnings } = collected;
+  let { folderData } = collected;
 
   let collapsedCounts = new Map<string, CollapseRecord>();
   if (collapse) {
@@ -928,7 +929,7 @@ function buildOverviewFolders(
   if (folderData.size === 0) return { folders: [], warnings };
 
   const ctx: SelectionContext = {
-    corpus: loadSearchCorpus(contentPath, configPath),
+    corpus: loadSearchCorpus(vault),
     probeCache: new Map(),
     vaultStats,
     vaultNotes,
@@ -985,11 +986,11 @@ function buildOverviewFolders(
 }
 
 export function getOverview(
-  contentPath: string,
-  configPath: string,
+  vault: VaultInfo,
   opts?: OverviewOptions,
 ): VaultOverview {
-  const config = loadConfig(configPath);
+  const { contentPath, configPath } = vault;
+  const config = effectiveConfig(vault);
   const maxDepth = opts?.depth ?? config.overview.depth;
   const maxKeywords = opts?.keywords ?? config.overview.keywords;
   const collapse = opts?.collapse ?? config.overview.collapse;
@@ -1009,8 +1010,7 @@ export function getOverview(
   if (cached) return cached;
 
   const { folders, warnings } = buildOverviewFolders(
-    contentPath,
-    configPath,
+    vault,
     maxDepth,
     maxKeywords,
     config.templates.folder,

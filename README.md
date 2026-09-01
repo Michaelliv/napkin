@@ -81,6 +81,36 @@ Napkin.scaffold("/path/to/project", { template: "coding" });
 Napkin.vaultTemplates(); // list available templates
 ```
 
+### Config in code
+
+Pass a config and the instance takes every setting from it — including the
+vault layout. `.napkin/config.json` is never read on any of its code paths, so
+a value stored in a vault years ago cannot outrank the one your source says
+today:
+
+```typescript
+import {
+  Napkin,
+  DEFAULT_CONFIG,
+  SIBLING_VAULT_LAYOUT,
+  type NapkinConfig,
+} from "@shiftlabs/napkin";
+
+const CONFIG: NapkinConfig = {
+  ...DEFAULT_CONFIG,
+  overview: { depth: 3, keywords: 0, collapse: true },
+  vault: SIBLING_VAULT_LAYOUT,
+};
+
+const n = new Napkin("/path/to/project", { config: CONFIG });
+n.overview();                  // uses CONFIG
+n.overview({ depth: 1 });      // per-call options still win, per field
+n.configSet("overview.depth", "1"); // throws: the source owns this
+```
+
+The object is copied and frozen at construction. Without the option nothing
+changes: the vault's config.json is read as before.
+
 All SDK methods return typed data and throw errors on failure. No `console.log`, no `process.exit`.
 
 ---

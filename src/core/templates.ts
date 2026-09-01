@@ -1,16 +1,15 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { loadConfig } from "../utils/config.js";
+import { effectiveConfig } from "../utils/config.js";
 import { listFiles, resolveFile } from "../utils/files.js";
 import type { VaultInfo } from "../utils/vault.js";
 
-function getTemplateFolder(configPath: string): string {
-  const config = loadConfig(configPath);
-  return config.templates.folder;
+function getTemplateFolder(vault: VaultInfo): string {
+  return effectiveConfig(vault).templates.folder;
 }
 
 export function listTemplates(v: VaultInfo): string[] {
-  const folder = getTemplateFolder(v.configPath);
+  const folder = getTemplateFolder(v);
   return listFiles(v.contentPath, { folder, ext: "md" }).map((f) =>
     path.basename(f, ".md"),
   );
@@ -31,7 +30,7 @@ export function readTemplate(
   name: string,
   opts?: { resolve?: boolean; title?: string },
 ): { template: string; content: string } {
-  const folder = getTemplateFolder(v.configPath);
+  const folder = getTemplateFolder(v);
   const resolved =
     resolveFile(v.contentPath, `${folder}/${name}`) ||
     resolveFile(v.contentPath, name);
@@ -58,7 +57,7 @@ export function insertTemplate(
   templateName: string,
   fileRef: string,
 ): { file: string; template: string; inserted: boolean } {
-  const folder = getTemplateFolder(v.configPath);
+  const folder = getTemplateFolder(v);
   const templateResolved =
     resolveFile(v.contentPath, `${folder}/${templateName}`) ||
     resolveFile(v.contentPath, templateName);

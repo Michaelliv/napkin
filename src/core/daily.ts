@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { loadConfig } from "../utils/config.js";
+import { effectiveConfig } from "../utils/config.js";
 import { parseFrontmatter } from "../utils/frontmatter.js";
 import type { VaultInfo } from "../utils/vault.js";
 
@@ -10,8 +10,8 @@ interface DailyConfig {
   template: string;
 }
 
-function getDailyConfig(configPath: string): DailyConfig {
-  const config = loadConfig(configPath);
+function getDailyConfig(vault: VaultInfo): DailyConfig {
+  const config = effectiveConfig(vault);
   return {
     folder: config.daily.folder,
     format: config.daily.format,
@@ -46,8 +46,8 @@ function formatDate(date: Date, format: string): string {
     .replace(/ss/g, String(date.getSeconds()).padStart(2, "0"));
 }
 
-export function getDailyPath(configPath: string, date?: Date): string {
-  const config = getDailyConfig(configPath);
+export function getDailyPath(vault: VaultInfo, date?: Date): string {
+  const config = getDailyConfig(vault);
   const d = date || new Date();
   const filename = formatDate(d, config.format);
   const folder = config.folder || "";
@@ -55,12 +55,12 @@ export function getDailyPath(configPath: string, date?: Date): string {
 }
 
 export function ensureDaily(v: VaultInfo): { path: string; created: boolean } {
-  const dp = getDailyPath(v.configPath);
+  const dp = getDailyPath(v);
   const fullPath = path.join(v.contentPath, dp);
 
   if (!fs.existsSync(fullPath)) {
     fs.mkdirSync(path.dirname(fullPath), { recursive: true });
-    const config = getDailyConfig(v.configPath);
+    const config = getDailyConfig(v);
     let content = "";
     if (config.template) {
       const templatePath = path.join(v.contentPath, `${config.template}.md`);
@@ -76,7 +76,7 @@ export function ensureDaily(v: VaultInfo): { path: string; created: boolean } {
 }
 
 export function readDaily(v: VaultInfo): { path: string; content: string } {
-  const dp = getDailyPath(v.configPath);
+  const dp = getDailyPath(v);
   const fullPath = path.join(v.contentPath, dp);
 
   if (!fs.existsSync(fullPath)) {
@@ -92,7 +92,7 @@ export function appendDaily(
   content: string,
   inline?: boolean,
 ): string {
-  const dp = getDailyPath(v.configPath);
+  const dp = getDailyPath(v);
   const fullPath = path.join(v.contentPath, dp);
 
   if (!fs.existsSync(fullPath)) {
@@ -112,7 +112,7 @@ export function prependDaily(
   content: string,
   inline?: boolean,
 ): string {
-  const dp = getDailyPath(v.configPath);
+  const dp = getDailyPath(v);
   const fullPath = path.join(v.contentPath, dp);
 
   if (!fs.existsSync(fullPath)) {
