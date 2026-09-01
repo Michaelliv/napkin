@@ -1,6 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import {
+  DEFAULT_CONFIG,
+  type NapkinConfig,
+  type OverviewOptions,
+  type SearchOptions,
+  SIBLING_VAULT_LAYOUT,
+  type VaultLayout,
+} from "./index.js";
 import { Napkin } from "./sdk.js";
 import { createTempVault } from "./utils/test-helpers.js";
 
@@ -327,6 +335,47 @@ describe("canvas", () => {
     const { canvas } = n.canvasRead("test");
     expect(canvas.nodes.length).toBe(1);
     expect(canvas.nodes[0].text).toBe("Hello");
+  });
+});
+
+// ── Public config surface ─────────────────────────────────────────
+
+// Consumers that own napkin's tuning in code (rather than letting a
+// vault's config.json decide) type their constants against these. The
+// test is mostly a compile-time assertion: if a refactor stops
+// exporting one of them from the package root, this file fails to
+// typecheck, and the runtime checks below fail too.
+describe("public config exports", () => {
+  test("DEFAULT_CONFIG satisfies NapkinConfig", () => {
+    const config: NapkinConfig = DEFAULT_CONFIG;
+    expect(typeof config.overview.depth).toBe("number");
+    expect(typeof config.overview.keywords).toBe("number");
+    expect(typeof config.overview.collapse).toBe("boolean");
+    expect(typeof config.search.limit).toBe("number");
+    expect(typeof config.search.snippetLines).toBe("number");
+    expect(typeof config.daily.folder).toBe("string");
+    expect(typeof config.templates.folder).toBe("string");
+    expect(config.graph.renderer).toBe("auto");
+  });
+
+  test("SIBLING_VAULT_LAYOUT satisfies VaultLayout", () => {
+    const layout: VaultLayout = SIBLING_VAULT_LAYOUT;
+    expect(layout.root).toBe("..");
+    expect(layout.obsidian).toBe("../.obsidian");
+  });
+
+  test("OverviewOptions types the overview call", () => {
+    const opts: OverviewOptions = {
+      depth: DEFAULT_CONFIG.overview.depth,
+      keywords: DEFAULT_CONFIG.overview.keywords,
+      collapse: DEFAULT_CONFIG.overview.collapse,
+    };
+    expect(n.overview(opts).overview.length).toBeGreaterThan(0);
+  });
+
+  test("SearchOptions types the search call", () => {
+    const opts: SearchOptions = { limit: DEFAULT_CONFIG.search.limit };
+    expect(n.search("vault", opts).length).toBeGreaterThan(0);
   });
 });
 

@@ -43,6 +43,20 @@ export interface VaultOverview {
   warnings?: string[];
 }
 
+/**
+ * Overview tuning. Every field falls back to the vault's config when
+ * omitted, so a caller that owns these values in code can pass them
+ * explicitly and never inherit a vault's stored defaults.
+ */
+export interface OverviewOptions {
+  /** How many folder levels deep to walk. */
+  depth?: number;
+  /** Max keywords per folder row; 0 = quality-governed, no cap. */
+  keywords?: number;
+  /** Roll up numerous, lexically homogeneous sibling folders into one row. */
+  collapse?: boolean;
+}
+
 // Homogeneous-sibling collapse: parents with at least this many children
 // whose term distributions are at least this similar (mean pairwise cosine
 // over top terms) are rendered as a single aggregate row. Tuned against a
@@ -973,7 +987,7 @@ function buildOverviewFolders(
 export function getOverview(
   contentPath: string,
   configPath: string,
-  opts?: { depth?: number; keywords?: number; collapse?: boolean },
+  opts?: OverviewOptions,
 ): VaultOverview {
   const config = loadConfig(configPath);
   const maxDepth = opts?.depth ?? config.overview.depth;

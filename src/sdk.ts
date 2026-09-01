@@ -69,7 +69,11 @@ import {
   getUnresolvedLinks,
 } from "./core/links.js";
 import { getOutline } from "./core/outline.js";
-import { getOverview, type VaultOverview } from "./core/overview.js";
+import {
+  getOverview,
+  type OverviewOptions,
+  type VaultOverview,
+} from "./core/overview.js";
 import {
   collectProperties,
   readProperty,
@@ -115,11 +119,7 @@ export class Napkin {
     return getVaultMetadata(this.vault);
   }
 
-  overview(opts?: {
-    depth?: number;
-    keywords?: number;
-    collapse?: boolean;
-  }): VaultOverview {
+  overview(opts?: OverviewOptions): VaultOverview {
     return getOverview(this.vault.contentPath, this.vault.configPath, opts);
   }
 

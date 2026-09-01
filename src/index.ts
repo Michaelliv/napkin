@@ -16,7 +16,11 @@ export type {
   ScaffoldResult,
   TemplateInfo,
 } from "./core/init.js";
-export type { OverviewFolder, VaultOverview } from "./core/overview.js";
+export type {
+  OverviewFolder,
+  OverviewOptions,
+  VaultOverview,
+} from "./core/overview.js";
 export type { SearchOptions, SearchResult } from "./core/search.js";
 export type { TagInfo } from "./core/tags.js";
 export type { TaskShowResult, TaskWithFile } from "./core/tasks.js";
@@ -24,5 +28,7 @@ export type { VaultMetadata } from "./core/vault.js";
 export type { WordCount } from "./core/wordcount.js";
 export { Napkin } from "./sdk.js";
 export type { VaultTemplate } from "./templates/types.js";
+export type { NapkinConfig, VaultLayout } from "./utils/config.js";
+export { DEFAULT_CONFIG, SIBLING_VAULT_LAYOUT } from "./utils/config.js";
 export type { Heading } from "./utils/markdown.js";
 export type { VaultInfo } from "./utils/vault.js";
